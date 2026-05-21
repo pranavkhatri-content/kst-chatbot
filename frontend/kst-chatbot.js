@@ -243,6 +243,41 @@
     });
   }
 
+  // ── Reset chat to a fresh state ───────────────────────────────────────────────
+  function resetChat() {
+    // Clear conversation history
+    history.length = 0;
+    conversationMode = 'normal';
+
+    // Clear all messages from the screen
+    const container = document.getElementById('kst-chat-messages');
+    container.innerHTML = '';
+
+    // Re-enable input
+    const input   = document.getElementById('kst-chat-input');
+    const sendBtn = document.getElementById('kst-chat-send');
+    input.disabled    = false;
+    input.placeholder = 'Ask about KST…';
+    input.value       = '';
+    input.style.height = 'auto';
+    sendBtn.disabled  = false;
+
+    // Show welcome message again
+    appendMessage('bot', WELCOME_MSG);
+    input.focus();
+  }
+
+  // ── "Start New Chat" restart button ──────────────────────────────────────────
+  function appendRestartBtn() {
+    const container = document.getElementById('kst-chat-messages');
+    const div = document.createElement('div');
+    div.className = 'kst-restart-wrapper';
+    div.innerHTML = `<button class="kst-restart-btn">🔄 Start New Chat</button>`;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+    div.querySelector('.kst-restart-btn').addEventListener('click', resetChat);
+  }
+
   // ── "Do you have any other doubt?" prompt ────────────────────────────────────
   function appendFollowUp() {
     if (conversationMode === 'ended') return;
@@ -278,6 +313,7 @@
       input.disabled = true;
       input.placeholder = 'Chat ended';
       sendBtn.disabled = true;
+      setTimeout(() => appendRestartBtn(), 400);
     });
   }
 
@@ -380,6 +416,7 @@
       input.placeholder = 'Chat ended';
       sendBtn.disabled = true;
       container.scrollTop = container.scrollHeight;
+      setTimeout(() => appendRestartBtn(), 400);
     });
   }
 

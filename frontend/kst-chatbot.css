@@ -584,3 +584,34 @@
   color: #333;
   line-height: 1.5;
 }
+
+/* ══════════════════════════════════════════════════════════
+   Start New Chat — restart button
+   ══════════════════════════════════════════════════════════ */
+.kst-restart-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
+  animation: kst-fade-in 0.25s ease;
+}
+
+.kst-restart-btn {
+  padding: 8px 22px;
+  background: transparent;
+  color: #e8440a;
+  border: 1.5px solid #e8440a;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.kst-restart-btn:hover {
+  background: #e8440a;
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(232,68,10,0.3);
+  transform: translateY(-1px);
+}
