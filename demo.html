@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kelkoo Merchant Centre — Sales Tracking (RAG)</title>
+  <link rel="stylesheet" href="frontend/kst-chatbot.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f4f5f7; color: #1a1a2e; display: flex; flex-direction: column; min-height: 100vh; }
+
+    /* ── Top Nav ── */
+    .topnav {
+      background: #1a1a2e;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .topnav .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .topnav .logo-icon {
+      width: 32px; height: 32px;
+      background: #e8440a; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .topnav .logo-text { color: #fff; font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+    .topnav .logo-text span { color: #e8440a; }
+    .topnav-links { display: flex; gap: 4px; margin-left: 24px; }
+    .topnav-links a {
+      color: rgba(255,255,255,0.65); font-size: 13px; padding: 6px 12px;
+      border-radius: 6px; text-decoration: none; transition: background 0.15s, color 0.15s;
+    }
+    .topnav-links a:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    .topnav-links a.active { background: rgba(232,68,10,0.2); color: #e8440a; }
+    .topnav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    .campaign-selector {
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+      color: #fff; font-size: 12px; padding: 6px 10px; border-radius: 6px;
+      cursor: pointer; display: flex; align-items: center; gap: 6px;
+    }
+    .avatar {
+      width: 32px; height: 32px; border-radius: 50%; background: #e8440a;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+
+    /* ── Layout ── */
+    .layout { display: flex; flex: 1; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 220px; background: #fff; border-right: 1px solid #e8eaf0;
+      padding: 20px 0; flex-shrink: 0; position: sticky;
+      top: 56px; height: calc(100vh - 56px); overflow-y: auto;
+    }
+    .sidebar-section { margin-bottom: 24px; }
+    .sidebar-label {
+      font-size: 10px; font-weight: 700; color: #aaa;
+      letter-spacing: 0.8px; text-transform: uppercase; padding: 0 20px 8px;
+    }
+    .sidebar a {
+      display: flex; align-items: center; gap: 10px; padding: 9px 20px;
+      font-size: 13px; color: #555; text-decoration: none;
+      border-left: 3px solid transparent; transition: background 0.15s, color 0.15s;
+    }
+    .sidebar a:hover { background: #f8f9fb; color: #1a1a2e; }
+    .sidebar a.active { background: #fef1ec; color: #e8440a; border-left-color: #e8440a; font-weight: 600; }
+
+    /* ── Main ── */
+    .main { flex: 1; padding: 32px; overflow-y: auto; }
+    .page-header { margin-bottom: 28px; }
+    .page-header h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .page-header p { color: #666; font-size: 14px; }
+    .breadcrumb { font-size: 12px; color: #999; margin-bottom: 10px; }
+    .breadcrumb span { color: #e8440a; }
+
+    /* ── Banner ── */
+    .status-banner {
+      background: #fff8f0; border: 1px solid #fcd5b8; border-radius: 10px;
+      padding: 14px 18px; display: flex; align-items: center; gap: 12px;
+      margin-bottom: 24px; font-size: 13px;
+    }
+    .dot { width: 10px; height: 10px; background: #f59e0b; border-radius: 50%; flex-shrink: 0; }
+    .dot.green { background: #10b981; }
+    .status-banner a { color: #e8440a; text-decoration: none; font-weight: 500; }
+
+    /* ── Stats ── */
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+    .stat-card {
+      background: #fff; border-radius: 12px; padding: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06); border: 1px solid #f0f0f5;
+    }
+    .stat-card .label { font-size: 12px; color: #888; margin-bottom: 8px; font-weight: 500; }
+    .stat-card .value { font-size: 24px; font-weight: 700; color: #1a1a2e; }
+    .stat-card .change { font-size: 12px; margin-top: 4px; }
+    .change.up { color: #10b981; } .change.down { color: #ef4444; } .change.neutral { color: #999; }
+
+    /* ── KST Card ── */
+    .section-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .section-title .badge { background: #fef1ec; color: #e8440a; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+
+    .kst-status-card {
+      background: #fff; border-radius: 12px; padding: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06); border: 1px solid #f0f0f5; margin-bottom: 24px;
+    }
+    .kst-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .kst-title { font-size: 15px; font-weight: 600; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    }
+    .pill.warning { background: #fef3c7; color: #92400e; }
+    .kst-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .kst-step { border: 1px solid #e8eaf0; border-radius: 10px; padding: 16px; }
+    .kst-step .step-num {
+      width: 24px; height: 24px; border-radius: 50%; background: #e8440a; color: #fff;
+      font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-bottom: 10px;
+    }
+    .kst-step.done { border-color: #a7f3d0; background: #f0fdf9; }
+    .kst-step.done .step-num { background: #10b981; }
+    .kst-step h4 { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .kst-step p { font-size: 12px; color: #666; line-height: 1.4; }
+
+    /* ── Platforms ── */
+    .platforms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .platform-card {
+      background: #fff; border: 1px solid #e8eaf0; border-radius: 10px; padding: 16px;
+      text-align: center; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .platform-card:hover { border-color: #e8440a; box-shadow: 0 2px 8px rgba(232,68,10,0.1); }
+    .platform-card .icon { font-size: 24px; margin-bottom: 8px; }
+    .platform-card h4 { font-size: 13px; font-weight: 600; color: #1a1a2e; margin-bottom: 2px; }
+    .platform-card p { font-size: 11px; color: #888; }
+
+    /* ── Help Banner ── */
+    .help-banner {
+      background: linear-gradient(135deg, #1a1a2e 0%, #2d2d4e 100%);
+      border-radius: 12px; padding: 28px;
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    }
+    .help-banner h3 { color: #fff; font-size: 17px; margin-bottom: 6px; }
+    .help-banner p { color: rgba(255,255,255,0.65); font-size: 13px; line-height: 1.5; }
+    .help-banner-icon { font-size: 52px; flex-shrink: 0; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+      cursor: pointer; border: none; text-decoration: none; transition: background 0.15s;
+    }
+    .btn-primary { background: #e8440a; color: #fff; }
+    .btn-primary:hover { background: #c73608; }
+    .btn-ghost { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
+    .btn-ghost:hover { background: rgba(255,255,255,0.18); }
+    .btn-row { display: flex; gap: 10px; margin-top: 18px; }
+  </style>
+</head>
+<body>
+
+<!-- Top Nav -->
+<nav class="topnav">
+  <a class="logo" href="#">
+    <div class="logo-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+    </div>
+    <span class="logo-text">Kelkoo <span>Merchant Centre</span></span>
+  </a>
+  <div class="topnav-links">
+    <a href="#">Dashboard</a>
+    <a href="#" class="active">Sales Tracking</a>
+    <a href="#">Statistics</a>
+    <a href="#">Products</a>
+    <a href="#">Billing</a>
+  </div>
+  <div class="topnav-right">
+    <div class="campaign-selector">100523248 · UK ▾</div>
+    <div class="avatar">PK</div>
+  </div>
+</nav>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Sales Tracking</div>
+      <a href="#" class="active">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+        Overview
+      </a>
+      <a href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
+        Installation
+      </a>
+      <a href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        Test & Verify
+      </a>
+      <a href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+        Troubleshooting
+      </a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Account</div>
+      <a href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.516c-1.392 0-2.516-1.124-2.516-2.516S10.608 10.484 12 10.484s2.516 1.124 2.516 2.516S13.392 15.516 12 15.516zm6.44-1.936l1.328.984c.12.096.152.264.072.408l-1.256 2.184a.328.328 0 0 1-.4.144l-1.568-.632a5.98 5.98 0 0 1-1.056.608l-.232 1.664a.32.32 0 0 1-.32.272H11.99a.32.32 0 0 1-.32-.272l-.232-1.664a5.834 5.834 0 0 1-1.056-.608l-1.568.632a.328.328 0 0 1-.4-.144L7.158 14.97a.328.328 0 0 1 .072-.408l1.328-.984a6.1 6.1 0 0 1-.056-.576c0-.192.02-.384.056-.576l-1.328-.984a.328.328 0 0 1-.072-.408L8.414 8.85a.328.328 0 0 1 .4-.144l1.568.632c.328-.224.68-.416 1.056-.608l.232-1.664A.32.32 0 0 1 11.99 6.8h2.52a.32.32 0 0 1 .32.272l.232 1.664c.376.192.728.384 1.056.608l1.568-.632a.328.328 0 0 1 .4.144l1.256 2.184a.328.328 0 0 1-.072.408l-1.328.984c.036.192.056.384.056.576s-.02.384-.056.576z"/></svg>
+        Settings
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main">
+
+    <div class="breadcrumb">Merchant Centre › <span>Sales Tracking</span></div>
+    <div class="page-header">
+      <h1>Kelkoo Sales Tracking</h1>
+      <p>Monitor, install and test your KST integration to accurately measure campaign performance.</p>
+    </div>
+
+    <!-- Status Banner -->
+    <div class="status-banner">
+      <div class="dot"></div>
+      <div>
+        <strong>Action required:</strong> Your Lead Tag was detected but no Conversion Tag calls have been registered in the last 7 days.
+        <a href="#">View troubleshooting guide →</a>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="label">Sales Tracked (30d)</div>
+        <div class="value">1,284</div>
+        <div class="change up">↑ 12% vs prev period</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Revenue Tracked</div>
+        <div class="value">£48,320</div>
+        <div class="change up">↑ 8.4%</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Conversion Rate</div>
+        <div class="value">3.2%</div>
+        <div class="change down">↓ 0.3%</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Last Pixel Call</div>
+        <div class="value" style="font-size:16px;margin-top:4px;">2 days ago</div>
+        <div class="change neutral">Check status below</div>
+      </div>
+    </div>
+
+    <!-- Integration Status -->
+    <div class="section-title">Integration Status</div>
+    <div class="kst-status-card">
+      <div class="kst-header">
+        <div class="kst-title">Setup Progress</div>
+        <span class="pill warning">⚠ Needs Attention</span>
+      </div>
+      <div class="kst-steps">
+        <div class="kst-step done">
+          <div class="step-num">✓</div>
+          <h4>Lead Tag</h4>
+          <p>Detected and firing correctly on all pages.</p>
+        </div>
+        <div class="kst-step">
+          <div class="step-num">2</div>
+          <h4>Conversion Tag</h4>
+          <p>No calls registered recently. Check your confirmation page setup.</p>
+        </div>
+        <div class="kst-step">
+          <div class="step-num">3</div>
+          <h4>Sales Reporting</h4>
+          <p>Awaiting conversion data to begin reporting.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Platform Guides -->
+    <div class="section-title">
+      Installation Guides
+      <span class="badge">9 platforms</span>
+    </div>
+    <div class="platforms-grid">
+      <div class="platform-card"><div class="icon">🛍️</div><h4>Shopify</h4><p>Customer Events</p></div>
+      <div class="platform-card"><div class="icon">🔧</div><h4>WooCommerce</h4><p>WordPress plugin</p></div>
+      <div class="platform-card"><div class="icon">📦</div><h4>GTM</h4><p>Recommended</p></div>
+      <div class="platform-card"><div class="icon">⚡</div><h4>Manual</h4><p>Any platform</p></div>
+      <div class="platform-card"><div class="icon">🔴</div><h4>Magento</h4><p>v1 &amp; v2</p></div>
+      <div class="platform-card"><div class="icon">🐘</div><h4>PrestaShop</h4><p>1.6, 1.7, 8</p></div>
+      <div class="platform-card"><div class="icon">⚡</div><h4>LightSpeed</h4><p>C-Series</p></div>
+      <div class="platform-card"><div class="icon">🇭🇺</div><h4>Unas</h4><p>Plugin</p></div>
+      <div class="platform-card"><div class="icon">🖥️</div><h4>Server-to-Server</h4><p>Advanced</p></div>
+    </div>
+
+    <!-- Help Banner -->
+    <div class="help-banner">
+      <div>
+        <h3>Need help with your KST setup?</h3>
+        <p>Our AI assistant can guide you through installation, troubleshoot issues,<br>and answer any KST questions — instantly, in your language.</p>
+        <div class="btn-row">
+          <a href="#" class="btn btn-primary">💬 Chat with KST Assistant</a>
+          <a href="#" class="btn btn-ghost">View documentation</a>
+        </div>
+      </div>
+      <div class="help-banner-icon">🤖</div>
+    </div>
+
+  </main>
+</div>
+
+<!-- KST Chatbot Widget (RAG version) -->
+<script src="frontend/kst-chatbot.js" data-api="http://localhost:8000/chat"></script>
+
+</body>
+</html>
