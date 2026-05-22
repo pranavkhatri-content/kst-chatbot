@@ -39,9 +39,10 @@ def embed_query(text: str) -> list[float]:
     return resp.json()["embedding"]["values"]
 
 
-def retrieve(query: str, top_k: int = 5) -> list[dict]:
+def retrieve(query: str, top_k: int = 3, max_distance: float = 1.0) -> list[dict]:
     """
-    Returns a list of the top_k most relevant chunks, each with:
+    Returns up to top_k relevant chunks whose cosine distance is below
+    max_distance.  Each result dict contains:
       - content  (str)
       - topic    (str)
       - doc_url  (str)
@@ -62,12 +63,18 @@ def retrieve(query: str, top_k: int = 5) -> list[dict]:
         results["metadatas"][0],
         results["distances"][0],
     ):
+        print(f"  [{round(dist, 4)}] {meta['topic']}")
+        if dist > max_distance:
+            break
         chunks.append({
             "content": doc,
             "topic": meta["topic"],
             "doc_url": meta["doc_url"],
             "score": round(dist, 4),
         })
+
+    if not chunks:
+        print(f"  ⚠ All {top_k} results exceeded max_distance={max_distance}")
 
     return chunks
 

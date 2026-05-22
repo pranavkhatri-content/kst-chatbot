@@ -76,20 +76,18 @@ async def chat(request: ChatRequest):
     if not request.messages:
         raise HTTPException(status_code=400, detail="No messages provided")
 
-    # ── 1. Retrieve relevant chunks for the latest user message ──────────────
-    latest_user_msg = next(
-        (m.content for m in reversed(request.messages) if m.role == "user"),
-        None,
-    )
-    if not latest_user_msg:
+    # ── 1. Retrieve relevant chunks using recent conversation context ────────
+    user_messages = [m.content for m in request.messages if m.role == "user"]
+    if not user_messages:
         raise HTTPException(status_code=400, detail="No user message found")
 
+    retrieval_query = " ".join(user_messages[-3:])
+
     async with httpx.AsyncClient(timeout=30) as client:
-        # Embed query and retrieve top 5 chunks
-        chunks = retrieve(latest_user_msg, top_k=5)
+        chunks = retrieve(retrieval_query, top_k=3)
         context = build_context(chunks)
 
-        # ── 2. Build dynamic system prompt with retrieved context ─────────────
+        # ── 2. Build dynamic system prompt with retrieved context ────────────
         system_prompt = (
             BASE_SYSTEM_PROMPT
             + "\n\n---\n\n## Relevant KST Documentation (retrieved for this query)\n\n"
