@@ -1,13 +1,28 @@
 """
 KST knowledge base split into discrete chunks for RAG ingestion.
-Each chunk has an id, topic, and content.
+
+Each chunk has:
+  - id:       unique identifier
+  - topic:    human-readable label (also embedded)
+  - queries:  anticipated user phrasings (embedded alongside topic+content
+              to pull the vector closer to real user language)
+  - doc_url:  canonical documentation link
+  - content:  the knowledge the LLM reads at answer time
 """
 
 CHUNKS = [
+    # ── General / Conceptual ───────────────────────────────────────────────────
     {
         "id": "kst_overview",
         "topic": "What is KST / Overview",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking",
+        "queries": [
+            "what is KST",
+            "what is Kelkoo Sales Tracking",
+            "how does KST work",
+            "what are the lead tag and conversion tag",
+            "what do I need to install for tracking",
+        ],
         "content": """
 What is KST?
 Kelkoo Sales Tracking (KST) is a first-party cookie-based tracking solution that tracks sales on a merchant's website, associates them with users, and sends the data to Kelkoo servers to measure campaign performance.
@@ -25,6 +40,13 @@ KST also functions as a Master Tag, similar to Google Tag Manager — it can hos
         "id": "attribution_model",
         "topic": "Attribution model / conversion window",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/understanding-kelkoo-sales-tracking",
+        "queries": [
+            "how does KST attribution work",
+            "what is the conversion window",
+            "how long does the cookie last",
+            "last click attribution",
+            "why do my numbers differ from Google Analytics",
+        ],
         "content": """
 Attribution Model:
 KST uses a Kelkoo Channel Last Click attribution model with a 30-day conversion window.
@@ -37,6 +59,14 @@ KST uses a Kelkoo Channel Last Click attribution model with a 30-day conversion 
         "id": "gdpr_privacy",
         "topic": "GDPR / Privacy / Cookies",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/gdpr-notice-for-kelkoo-sales-tracking",
+        "queries": [
+            "is KST GDPR compliant",
+            "what cookies does KST set",
+            "do I need consent for KST",
+            "KST privacy policy",
+            "what data does KST collect",
+            "cookie consent requirements",
+        ],
         "content": """
 Privacy & GDPR:
 KST sets three first-party cookies on the merchant's own domain:
@@ -58,6 +88,13 @@ GDPR Requirements:
         "id": "merchant_id",
         "topic": "How to find Merchant ID and Country Code",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods/how-to-get-your-merchantid-and-associated-country-code",
+        "queries": [
+            "where is my merchant ID",
+            "how do I find my merchant ID",
+            "where do I get my country code",
+            "what merchant ID do I use",
+            "campaign ID location",
+        ],
         "content": """
 How to Find Your Merchant ID and Country Code:
 1. Log into Kelkoo Merchant Centre at merchant.kelkoogroup.com
@@ -71,6 +108,13 @@ Each campaign has its own Merchant ID + country code pair. If you run campaigns 
         "id": "country_codes",
         "topic": "Country codes list",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods/list-of-country-codes-at-kelkoo-group",
+        "queries": [
+            "list of country codes",
+            "what country code for France",
+            "what country code for Germany",
+            "what country code for UK",
+            "supported countries",
+        ],
         "content": """
 Country Codes (2-letter lowercase):
 ae=United Arab Emirates, au=Australia, at=Austria, be=Belgium, br=Brazil, ca=Canada,
@@ -81,10 +125,18 @@ no=Norway, nz=New Zealand, ph=Philippines, pl=Poland, pt=Portugal, ru=Russia,
 se=Sweden, sg=Singapore, tr=Turkey, uk=United Kingdom, us=United States, vn=Vietnam, za=South Africa.
         """.strip()
     },
+
+    # ── Pre-installation ───────────────────────────────────────────────────────
     {
         "id": "install_pre_steps",
         "topic": "Before any installation / remove legacy tags",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods",
+        "queries": [
+            "what to do before installing KST",
+            "remove old Kelkoo tracking",
+            "legacy Kelkoo tags",
+            "duplicate tracking tags",
+        ],
         "content": """
 Before Any Installation:
 Always remove previous Kelkoo tracking first:
@@ -93,13 +145,45 @@ Always remove previous Kelkoo tracking first:
 - Uninstall any legacy Kelkoo plugins from your platform
         """.strip()
     },
+
+    # ── GTM (split into 3 focused chunks) ──────────────────────────────────────
     {
-        "id": "install_gtm",
-        "topic": "GTM installation via Google Tag Manager",
+        "id": "install_gtm_overview",
+        "topic": "GTM installation overview",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods/installation-via-google-tag-manager-gtm-with-enhanced-ecommerce",
+        "queries": [
+            "how to install KST with GTM",
+            "Google Tag Manager setup for KST",
+            "GTM installation steps overview",
+            "can I use GTM for Kelkoo tracking",
+        ],
         "content": """
 GTM Installation (Google Tag Manager) — Recommended Method:
 GTM is the preferred method if you use GTM with custom triggers. Requires a good understanding of GTM. Supports multiple campaigns.
+
+This method involves 5 steps:
+1. Identify your Data Layer variables using GTM Preview mode and Tag Assistant
+2. Create GTM Data Layer Variables for Order ID and Order Value
+3. Create a Custom Event Trigger matching your purchase event
+4. Install the Kelkoo Conversion Tag from the GTM template gallery
+5. Install the Kelkoo Lead Tag as a Custom HTML tag on All Pages
+
+After completing all steps, publish the GTM container.
+        """.strip()
+    },
+    {
+        "id": "install_gtm_datalayer",
+        "topic": "GTM data layer variables and trigger setup",
+        "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods/installation-via-google-tag-manager-gtm-with-enhanced-ecommerce",
+        "queries": [
+            "GTM data layer setup for KST",
+            "how to find my data layer variables",
+            "GTM preview mode purchase event",
+            "create GTM trigger for KST",
+            "order ID and order value variables in GTM",
+        ],
+        "content": """
+GTM Steps 1-3: Data Layer Variables and Trigger Setup
 
 Step 1 — Identify your Data Layer variables:
 1. Enable GTM Preview mode from your GTM dashboard
@@ -117,6 +201,21 @@ Step 3 — Create a Custom Event Trigger:
 1. Go to Triggers → New → Custom Event
 2. Set the event name to match Step 1 (e.g. purchase)
 3. Save
+        """.strip()
+    },
+    {
+        "id": "install_gtm_tags",
+        "topic": "GTM conversion tag and lead tag installation",
+        "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods/installation-via-google-tag-manager-gtm-with-enhanced-ecommerce",
+        "queries": [
+            "install Kelkoo conversion tag in GTM",
+            "install Kelkoo lead tag in GTM",
+            "GTM tag template for Kelkoo",
+            "how to add KST tags in Google Tag Manager",
+            "publish GTM container for KST",
+        ],
+        "content": """
+GTM Steps 4-5: Installing the Kelkoo Tags
 
 Step 4 — Install the Kelkoo Conversion Tag:
 1. Go to Tags → Templates → Search Gallery
@@ -132,10 +231,19 @@ Step 5 — Install the Kelkoo Lead Tag:
 4. Save and Publish the container
         """.strip()
     },
+
+    # ── Manual ─────────────────────────────────────────────────────────────────
     {
         "id": "install_manual",
         "topic": "Manual installation",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods/manual-installation-for-kelkoo-sales-tracking",
+        "queries": [
+            "manual KST installation",
+            "install KST without a plugin",
+            "add KST tracking code to my website",
+            "KST code snippet for any platform",
+            "how to add the lead tag and conversion tag manually",
+        ],
         "content": """
 Manual Installation (any platform):
 Works on any platform. Requires developer skills. Supports multiple campaigns.
@@ -167,10 +275,19 @@ Parameters: country (2-letter lowercase), merchantId (from Merchant Centre), ord
 Multiple campaigns: merchantInfo: [{ country: 'fr', merchantId: '12941513' }, { country: 'uk', merchantId: '56789' }]
         """.strip()
     },
+
+    # ── Shopify ────────────────────────────────────────────────────────────────
     {
         "id": "install_shopify",
         "topic": "Shopify / Shopify Plus installation",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods/installation-guides-for-ecommerce-platforms/shopify-shopify-plus",
+        "queries": [
+            "install KST on Shopify",
+            "Shopify Plus KST setup",
+            "Shopify custom pixel for Kelkoo",
+            "Shopify customer events tracking",
+            "Kelkoo tracking on Shopify",
+        ],
         "content": """
 Shopify / Shopify Plus Installation:
 Uses Shopify's Customer Events (Custom Pixels) — the current Shopify tracking approach.
@@ -219,10 +336,18 @@ analytics.subscribe("checkout_completed", event => {
 5. Click Connect
         """.strip()
     },
+
+    # ── WooCommerce ────────────────────────────────────────────────────────────
     {
         "id": "install_woocommerce",
         "topic": "WooCommerce installation",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods/installation-guides-for-ecommerce-platforms/woocommerce",
+        "queries": [
+            "install KST on WooCommerce",
+            "WooCommerce Kelkoo plugin",
+            "WordPress KST tracking setup",
+            "Kelkoo WooCommerce plugin settings",
+        ],
         "content": """
 WooCommerce (WordPress Plugin) Installation:
 WooCommerce installation uses an official Kelkoo plugin — no code editing needed.
@@ -244,14 +369,22 @@ Configure:
 4. Save
         """.strip()
     },
-    {
-        "id": "install_prestashop",
-        "topic": "PrestaShop installation (1.6, 1.7, 8)",
-        "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods/installation-guides-for-ecommerce-platforms/prestashop-8",
-        "content": """
-PrestaShop Installation (versions 1.6, 1.7, and 8):
 
-For PrestaShop 8 & 1.7:
+    # ── PrestaShop (split by version) ──────────────────────────────────────────
+    {
+        "id": "install_prestashop_8_17",
+        "topic": "PrestaShop 8 and 1.7 installation",
+        "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods/installation-guides-for-ecommerce-platforms/prestashop-8",
+        "queries": [
+            "install KST on PrestaShop 8",
+            "install KST on PrestaShop 1.7",
+            "PrestaShop KST tracking setup",
+            "Kelkoo tracking for PrestaShop",
+            "PrestaShop head.tpl lead tag",
+        ],
+        "content": """
+PrestaShop Installation (versions 8 and 1.7):
+
 Before starting: Enable template recompilation: Admin → Advanced Parameters → Performance → "Recompile templates if files have been updated". Back up all files.
 
 Step 1 — Lead Tag: Open themes/[your-theme]/templates/_partials/head.tpl and add:
@@ -269,8 +402,21 @@ Step 3 — Conversion Tag: Add to themes/[your-theme]/templates/checkout/_partia
   (function() { var s = document.createElement('script'); s.type='text/javascript'; s.async=true; s.src='https://s.kk-resources.com/ks.js'; var x=document.getElementsByTagName('script')[0]; x.parentNode.insertBefore(s,x); })();
 </script>
 Note: reinstallation required after any PrestaShop or theme updates.
+        """.strip()
+    },
+    {
+        "id": "install_prestashop_16",
+        "topic": "PrestaShop 1.6 installation",
+        "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods/installation-guides-for-ecommerce-platforms/prestashop-8",
+        "queries": [
+            "install KST on PrestaShop 1.6",
+            "PrestaShop 1.6 Kelkoo tracking",
+            "PrestaShop 1.6 header.tpl lead tag",
+            "PrestaShop 1.6 PayPal module KST",
+        ],
+        "content": """
+PrestaShop 1.6 Installation:
 
-For PrestaShop 1.6:
 Lead Tag: Open themes/[your-theme]/header.tpl and append:
 <script async="true" type="text/javascript" src="https://s.kk-resources.com/leadtag.js"></script>
 
@@ -278,14 +424,21 @@ Conversion Tag: Add to themes/[your-theme]/order-confirmation.tpl with literal t
 PayPal module: If PayPal enabled, apply same changes to /modules/paypal/controllers/front/submit.php and its template.
         """.strip()
     },
-    {
-        "id": "install_magento",
-        "topic": "Magento installation (Magento 1 and 2)",
-        "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods/installation-guides-for-ecommerce-platforms/magento",
-        "content": """
-Magento Installation:
 
-Magento 2 (up to version 2.3):
+    # ── Magento (split by version) ─────────────────────────────────────────────
+    {
+        "id": "install_magento2",
+        "topic": "Magento 2 installation",
+        "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods/installation-guides-for-ecommerce-platforms/magento",
+        "queries": [
+            "install KST on Magento 2",
+            "Magento 2 Kelkoo tracking module",
+            "Magento 2 lead tag XML layout",
+            "Kelkoo module for Magento 2",
+        ],
+        "content": """
+Magento 2 Installation (up to version 2.3):
+
 Lead Tag: Add to YourTheme/Magento_Theme/layout/default_head_blocks.xml:
 <script src="https://s.kk-resources.com/leadtag.js" src_type="url"/>
 
@@ -295,16 +448,36 @@ Conversion Tag:
 3. Extract to /app/code/
 4. Update country and merchantId in the success template file
 5. Enable the module via CLI
+        """.strip()
+    },
+    {
+        "id": "install_magento1",
+        "topic": "Magento 1 installation",
+        "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods/installation-guides-for-ecommerce-platforms/magento",
+        "queries": [
+            "install KST on Magento 1",
+            "Magento 1 Kelkoo tracking",
+            "Magento 1 checkout success.phtml",
+            "Magento 1 XML layout lead tag",
+        ],
+        "content": """
+Magento 1 Installation:
 
-Magento 1:
 Lead Tag: Add to your XML layout file inside <reference name="head"> block using core/text block type.
 Conversion Tag: Edit web/app/design/frontend/custom/default/template/checkout/success.phtml — use PHP to retrieve Order object and fire the _kkstrack conversion script.
         """.strip()
     },
+
+    # ── LightSpeed ─────────────────────────────────────────────────────────────
     {
         "id": "install_lightspeed",
         "topic": "LightSpeed C-Series installation",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods/installation-guides-for-ecommerce-platforms/lightspeed-c-series",
+        "queries": [
+            "install KST on LightSpeed",
+            "LightSpeed C-Series Kelkoo tracking",
+            "LightSpeed web extras tracking code",
+        ],
         "content": """
 LightSpeed C-Series Installation:
 Step 1: Log into LightSpeed and go to Web Extras from the left sidebar.
@@ -320,10 +493,17 @@ _kkstrack = {
 Step 4: Save and run a test purchase to verify tracking.
         """.strip()
     },
+
+    # ── Unas ───────────────────────────────────────────────────────────────────
     {
         "id": "install_unas",
         "topic": "Unas Ecommerce installation",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods/installation-guides-for-ecommerce-platforms/unas-ecommerce",
+        "queries": [
+            "install KST on Unas",
+            "Unas ecommerce Kelkoo tracking",
+            "Unas marketing external systems",
+        ],
         "content": """
 Unas Ecommerce Installation:
 Step 1: In your Unas dashboard, go to Marketing → External marketing systems
@@ -334,10 +514,19 @@ Step 5: Save
 Multiple campaigns: Go to Settings → Texts, Languages → Setting languages, add the required language/country combinations, and configure each corresponding merchantId.
         """.strip()
     },
+
+    # ── Server-to-Server ───────────────────────────────────────────────────────
     {
         "id": "install_server_to_server",
         "topic": "Server-to-server implementation (advanced)",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods/advanced-setup/server-to-server-implementation",
+        "queries": [
+            "server-to-server KST implementation",
+            "backend KST tracking without JavaScript",
+            "KST API integration",
+            "server side Kelkoo tracking",
+            "advanced KST setup",
+        ],
         "content": """
 Server-to-Server Implementation (Advanced):
 A backend implementation. Requires an in-house development team (~5 days minimum). Does not rely on browser scripts.
@@ -351,10 +540,20 @@ Code examples available for PHP 5.5+, Java 8, Python 3.x, and Node.js 20.x.
 Consent must be managed directly by the merchant separately from traditional cookie mechanisms.
         """.strip()
     },
+
+    # ── Testing ────────────────────────────────────────────────────────────────
     {
         "id": "testing",
         "topic": "Testing your KST setup",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/installation-methods/test-your-kelkoo-sales-tracking-setup",
+        "queries": [
+            "how to test KST",
+            "test my KST pixel",
+            "verify KST installation",
+            "check if KST is working",
+            "KST tester wizard",
+            "no sales showing in Merchant Centre",
+        ],
         "content": """
 Testing Your KST Setup:
 1. Log into Kelkoo Merchant Centre at merchant.kelkoogroup.com
@@ -368,10 +567,21 @@ Testing Your KST Setup:
 Primary debugging tool: https://merchant.kelkoogroup.com/app/campaign/sales-tracking
         """.strip()
     },
+
+    # ── Troubleshooting ────────────────────────────────────────────────────────
     {
         "id": "troubleshooting_general",
         "topic": "Troubleshooting general / no conversions showing",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/troubleshooting",
+        "queries": [
+            "KST not working",
+            "no conversions showing",
+            "sales not tracking",
+            "pixel not firing",
+            "troubleshoot KST",
+            "KST debugging",
+            "zero sales in dashboard",
+        ],
         "content": """
 General Troubleshooting Checklist (All Platforms):
 - Both Lead Tag (all pages) AND Conversion Tag (confirmation page only) are installed
@@ -389,6 +599,14 @@ Or contact Kelkoo Support via the contact form in Merchant Centre with subject: 
         "id": "troubleshooting_gtm",
         "topic": "GTM troubleshooting",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/troubleshooting/troubleshooting-gtm-integration",
+        "queries": [
+            "GTM KST not working",
+            "GTM tag not firing",
+            "orderId undefined in GTM",
+            "orderValue undefined in GTM",
+            "data layer not read correctly",
+            "GTM container not published",
+        ],
         "content": """
 GTM-Specific Troubleshooting:
 - Integration not working at all: Ensure you have published the container
@@ -403,6 +621,12 @@ GTM-Specific Troubleshooting:
         "id": "troubleshooting_shopify",
         "topic": "Shopify troubleshooting",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/troubleshooting/troubleshooting-shopify-integration",
+        "queries": [
+            "Shopify KST not working",
+            "Shopify pixel not firing",
+            "Shopify revenue formatting error",
+            "Shopify tracking not on all devices",
+        ],
         "content": """
 Shopify-Specific Troubleshooting:
 - Tag not firing on all devices: Ensure the pixel is not placed inside a device-specific section — it must be in a universal location
@@ -416,6 +640,12 @@ Shopify-Specific Troubleshooting:
         "id": "troubleshooting_prestashop",
         "topic": "PrestaShop troubleshooting",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking/troubleshooting/troubleshooting-prestashop-integration",
+        "queries": [
+            "PrestaShop KST not working",
+            "PrestaShop variables not replaced",
+            "PrestaShop literal tags issue",
+            "PrestaShop cache not clearing",
+        ],
         "content": """
 PrestaShop-Specific Troubleshooting:
 - Variables not replaced in source: Check there are no {literal} tags wrapping the <script> tag containing _kkstrack
@@ -423,10 +653,19 @@ PrestaShop-Specific Troubleshooting:
 - Changes not taking effect: Clear cache: Admin → Advanced → Performance → Refresh cache
         """.strip()
     },
+
+    # ── Performance ────────────────────────────────────────────────────────────
     {
         "id": "performance",
         "topic": "Performance and SPA notes",
         "doc_url": "https://docs.kelkoogroup.com/for-advertisers/kelkoo-sales-tracking",
+        "queries": [
+            "does KST slow down my site",
+            "KST performance impact",
+            "KST on single page application",
+            "KST file size",
+            "how fast is KST",
+        ],
         "content": """
 KST Performance:
 KST is lightweight and fully asynchronous:

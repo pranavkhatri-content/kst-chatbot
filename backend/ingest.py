@@ -55,7 +55,8 @@ def main():
     ids, embeddings, documents, metadatas = [], [], [], []
 
     for i, chunk in enumerate(CHUNKS):
-        text = f"{chunk['topic']}\n\n{chunk['content']}"
+        queries_block = "\n".join(chunk.get("queries", []))
+        text = f"{chunk['topic']}\n\n{queries_block}\n\n{chunk['content']}"
         print(f"  [{i+1}/{len(CHUNKS)}] {chunk['id']}")
         emb = get_embedding(text)
         ids.append(chunk["id"])
