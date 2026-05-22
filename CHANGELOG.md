@@ -5,6 +5,24 @@ Format: [Version] — Date — Author — Branch
 
 ---
 
+## [1.2.0] — 2026-05-22 — Pranav Khatri — feature/rag-retrieval-optimization
+
+Optimize RAG retrieval: split chunks, add query preambles, distance threshold, and conversational context
+
+- Split GTM (1→3), PrestaShop (1→2), and Magento (1→2) chunks into
+  focused sub-chunks for tighter embeddings (20→25 total chunks)
+- Add anticipated user query preambles to all chunks, embedded alongside
+  topic+content to improve semantic match with real user language
+- Add max_distance threshold (default 1.0) to retriever to filter
+  low-relevance results instead of always returning top_k
+- Reduce default top_k from 5 to 3 to cut context noise
+- Build retrieval query from last 3 user messages for multi-turn
+  conversational context (fixes follow-up questions losing topic)
+- Add distance debug logging to retriever for threshold tuning
+- Delete chroma_db — re-ingestion required via ingest.py
+
+---
+
 ## [1.1.0] — 2026-05-21 — Atik Jain — feat/atik-follow-up-sf-form
 
 This release combines two sets of work:
@@ -194,3 +212,4 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 | `main` | Production — original code | Untouched |
 | `fix/atik-static-files-and-api-key-fix` | Original bug fixes (not merged) | Superseded by below |
 | `feat/atik-follow-up-sf-form` | Bug fixes + all new features | Pending review & merge |
+| `feature/rag-retrieval-optimization` | RAG retrieval pipeline optimization | Pending review & merge |
