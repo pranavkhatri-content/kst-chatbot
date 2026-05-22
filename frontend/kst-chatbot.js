@@ -1,8 +1,7 @@
 /**
- * KST Chatbot Widget
+ * KST Chatbot Widget v1.2
  * Embed with:
  *   <script src="kst-chatbot.js" data-api="https://your-api-host/chat"></script>
- * Optional attribute: data-api — URL of your KST chatbot backend /chat endpoint.
  */
 (function () {
   'use strict';
@@ -14,40 +13,28 @@
   function renderMarkdown(text) {
     let html = text
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      // fenced code blocks
       .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
         `<pre><code class="lang-${lang}">${code.trim()}</code></pre>`)
-      // inline code
       .replace(/`([^`]+)`/g, '<code>$1</code>')
-      // markdown links [text](url) — must come before bold/italic
       .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
         (_, label, url) =>
-          `<a href="${url}" target="_blank" rel="noopener noreferrer">`+
-          `<svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>`+
+          `<a href="${url}" target="_blank" rel="noopener noreferrer">` +
+          `<svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>` +
           `${label}</a>`)
-      // bare URLs (not already inside an href)
       .replace(/(?<!['"=(])(https?:\/\/[^\s<>"')]+)/g,
         url =>
-          `<a href="${url}" target="_blank" rel="noopener noreferrer">`+
-          `<svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>`+
+          `<a href="${url}" target="_blank" rel="noopener noreferrer">` +
+          `<svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>` +
           `View documentation</a>`)
-      // bold
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      // italic
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      // headers
       .replace(/^### (.+)$/gm, '<h4>$1</h4>')
       .replace(/^## (.+)$/gm, '<h3>$1</h3>')
       .replace(/^# (.+)$/gm, '<h3>$1</h3>')
-      // horizontal rule
       .replace(/^---$/gm, '<hr>')
-      // unordered lists
       .replace(/^\s*[-*] (.+)$/gm, '<li>$1</li>')
-      // ordered lists
       .replace(/^\s*\d+\. (.+)$/gm, '<li>$1</li>')
-      // wrap consecutive <li>
       .replace(/(<li>[\s\S]+?<\/li>)(?=\s*<li>|$)/g, (m) => `<ul>${m}</ul>`)
-      // simple table rows (| a | b |)
       .replace(/^\|(.+)\|$/gm, (row) => {
         const cells = row.split('|').slice(1, -1);
         const isDivider = cells.every(c => /^[-: ]+$/.test(c));
@@ -55,11 +42,8 @@
         return '<tr>' + cells.map(c => `<td>${c.trim()}</td>`).join('') + '</tr>';
       })
       .replace(/(<tr>[\s\S]+?<\/tr>)/g, '<table>$1</table>')
-      // paragraphs (double newline)
       .replace(/\n\n+/g, '</p><p>')
-      // single newline
       .replace(/\n/g, '<br>');
-
     return '<p>' + html + '</p>';
   }
 
@@ -68,6 +52,8 @@
   let isOpen = false;
   let isLoading = false;
   let isExpanded = false;
+  // 'normal' | 'other_issue' | 'awaiting_resolution' | 'ended'
+  let conversationMode = 'normal';
 
   // ── SVG Icons ────────────────────────────────────────────────────────────────
   const ICON_EXPAND   = `<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>`;
@@ -82,9 +68,10 @@
     'Test my pixel',
     'No conversions showing',
     'Where is my Merchant ID?',
+    'Other Issue',
   ];
 
-  const WELCOME_MSG = 'Hi! I\'m the KST Support Assistant. I can help you understand Kelkoo Sales Tracking or guide you through installation on your platform. What would you like to know?';
+  const WELCOME_MSG = "Hi! I'm the KST Support Assistant. I can help you understand Kelkoo Sales Tracking or guide you through installation on your platform. What would you like to know?";
 
   // ── DOM Build ────────────────────────────────────────────────────────────────
   function buildWidget() {
@@ -128,10 +115,11 @@
     document.body.appendChild(fab);
     document.body.appendChild(win);
 
+    // Build chips — "Other Issue" gets a special style
     const chipsEl = win.querySelector('#kst-quick-chips');
     QUICK_CHIPS.forEach(label => {
       const btn = document.createElement('button');
-      btn.className = 'kst-chip';
+      btn.className = label === 'Other Issue' ? 'kst-chip kst-chip-other' : 'kst-chip';
       btn.textContent = label;
       btn.addEventListener('click', () => sendMessage(label));
       chipsEl.appendChild(btn);
@@ -158,6 +146,7 @@
       if (!isLoading) sendMessage(input.value);
     });
 
+    // Welcome message — no follow-up after this
     appendMessage('bot', WELCOME_MSG);
   }
 
@@ -179,7 +168,7 @@
     setTimeout(() => { msgs.scrollTop = msgs.scrollHeight; }, 310);
   }
 
-  // ── Toggle ───────────────────────────────────────────────────────────────────
+  // ── Toggle open/close ────────────────────────────────────────────────────────
   function toggleChat() {
     isOpen = !isOpen;
     const win = document.getElementById('kst-chat-window');
@@ -194,7 +183,7 @@
     }
   }
 
-  // ── Link post-processor ───────────────────────────────────────────────────────
+  // ── Link post-processor ──────────────────────────────────────────────────────
   const LINK_ICON = '<svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>';
   function linkifyBotMessage(el) {
     const walk = (node) => {
@@ -215,7 +204,7 @@
     Array.from(el.childNodes).forEach(walk);
   }
 
-  // ── Messages ─────────────────────────────────────────────────────────────────
+  // ── Append a chat message bubble ─────────────────────────────────────────────
   function appendMessage(role, text) {
     const container = document.getElementById('kst-chat-messages');
     const div = document.createElement('div');
@@ -231,6 +220,7 @@
     return div;
   }
 
+  // ── Typing indicator ─────────────────────────────────────────────────────────
   function showTyping() {
     const container = document.getElementById('kst-chat-messages');
     const el = document.createElement('div');
@@ -246,16 +236,211 @@
     if (el) el.remove();
   }
 
-  // ── Send ─────────────────────────────────────────────────────────────────────
+  // ── Disable action buttons after one is clicked ──────────────────────────────
+  function disableActionBtns(wrapper) {
+    wrapper.querySelectorAll('.kst-action-btn').forEach(btn => {
+      btn.disabled = true;
+    });
+  }
+
+  // ── Reset chat to a fresh state ───────────────────────────────────────────────
+  function resetChat() {
+    // Clear conversation history
+    history.length = 0;
+    conversationMode = 'normal';
+
+    // Clear all messages from the screen
+    const container = document.getElementById('kst-chat-messages');
+    container.innerHTML = '';
+
+    // Re-enable input
+    const input   = document.getElementById('kst-chat-input');
+    const sendBtn = document.getElementById('kst-chat-send');
+    input.disabled    = false;
+    input.placeholder = 'Ask about KST…';
+    input.value       = '';
+    input.style.height = 'auto';
+    sendBtn.disabled  = false;
+
+    // Show welcome message again
+    appendMessage('bot', WELCOME_MSG);
+    input.focus();
+  }
+
+  // ── "Start New Chat" restart button ──────────────────────────────────────────
+  function appendRestartBtn() {
+    const container = document.getElementById('kst-chat-messages');
+    const div = document.createElement('div');
+    div.className = 'kst-restart-wrapper';
+    div.innerHTML = `<button class="kst-restart-btn">🔄 Start New Chat</button>`;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+    div.querySelector('.kst-restart-btn').addEventListener('click', resetChat);
+  }
+
+  // ── "Do you have any other doubt?" prompt ────────────────────────────────────
+  function appendFollowUp() {
+    if (conversationMode === 'ended') return;
+    const container = document.getElementById('kst-chat-messages');
+    const div = document.createElement('div');
+    div.className = 'kst-followup';
+    div.innerHTML = `
+      <p class="kst-followup-text">Do you have any other doubt?</p>
+      <div class="kst-action-btns">
+        <button class="kst-action-btn kst-action-yes">Yes</button>
+        <button class="kst-action-btn kst-action-no">No, end chat</button>
+      </div>
+    `;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+
+    div.querySelector('.kst-action-yes').addEventListener('click', () => {
+      disableActionBtns(div);
+      appendMessage('bot', 'Sure! What would you like to know? Pick an option below or type your question.');
+      // Scroll chips into view
+      setTimeout(() => {
+        const chips = document.getElementById('kst-quick-chips');
+        if (chips) chips.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 200);
+    });
+
+    div.querySelector('.kst-action-no').addEventListener('click', () => {
+      disableActionBtns(div);
+      conversationMode = 'ended';
+      appendMessage('bot', 'Thank you for using KST Support! Have a great day. 👋');
+      const input = document.getElementById('kst-chat-input');
+      const sendBtn = document.getElementById('kst-chat-send');
+      input.disabled = true;
+      input.placeholder = 'Chat ended';
+      sendBtn.disabled = true;
+      setTimeout(() => appendRestartBtn(), 400);
+    });
+  }
+
+  // ── "Is your issue resolved?" prompt ─────────────────────────────────────────
+  function appendResolutionCheck() {
+    const container = document.getElementById('kst-chat-messages');
+    const div = document.createElement('div');
+    div.className = 'kst-followup';
+    div.innerHTML = `
+      <p class="kst-followup-text">Was this helpful? Is your issue resolved?</p>
+      <div class="kst-action-btns">
+        <button class="kst-action-btn kst-action-yes">Yes, resolved!</button>
+        <button class="kst-action-btn kst-action-no">No, still having issue</button>
+      </div>
+    `;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+
+    div.querySelector('.kst-action-yes').addEventListener('click', () => {
+      disableActionBtns(div);
+      conversationMode = 'normal';
+      appendMessage('bot', 'Great! Glad I could help. 😊');
+      setTimeout(() => appendFollowUp(), 400);
+    });
+
+    div.querySelector('.kst-action-no').addEventListener('click', () => {
+      disableActionBtns(div);
+      appendCreateCasePrompt();
+    });
+  }
+
+  // ── "Create SF Support Case" button ──────────────────────────────────────────
+  function appendCreateCasePrompt() {
+    const container = document.getElementById('kst-chat-messages');
+    const div = document.createElement('div');
+    div.className = 'kst-msg kst-bot';
+    div.innerHTML = `
+      <p>No worries! You can raise a support case and our KST team will get back to you.</p>
+      <button class="kst-create-case-btn">📋 Create SF Support Case</button>
+    `;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+
+    div.querySelector('.kst-create-case-btn').addEventListener('click', () => {
+      div.querySelector('.kst-create-case-btn').style.display = 'none';
+      appendSFForm();
+    });
+  }
+
+  // ── Salesforce case form ──────────────────────────────────────────────────────
+  function appendSFForm() {
+    const container = document.getElementById('kst-chat-messages');
+    const div = document.createElement('div');
+    div.className = 'kst-msg kst-bot kst-sf-wrapper';
+    div.innerHTML = `
+      <p class="kst-sf-title">🎫 Create Support Case</p>
+      <div class="kst-sf-form">
+        <input class="kst-sf-input" id="sf-name"  type="text"  placeholder="Your Name *" />
+        <input class="kst-sf-input" id="sf-mid"   type="text"  placeholder="Merchant ID *" />
+        <input class="kst-sf-input" id="sf-email" type="email" placeholder="Email Address *" />
+        <textarea class="kst-sf-textarea" id="sf-issue" placeholder="Describe your issue in detail... *" rows="4"></textarea>
+        <button class="kst-sf-submit">Submit Case →</button>
+      </div>
+    `;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+
+    div.querySelector('.kst-sf-submit').addEventListener('click', () => {
+      const nameEl  = div.querySelector('#sf-name');
+      const midEl   = div.querySelector('#sf-mid');
+      const emailEl = div.querySelector('#sf-email');
+      const issueEl = div.querySelector('#sf-issue');
+
+      // Validate all fields
+      let valid = true;
+      [nameEl, midEl, emailEl, issueEl].forEach(field => {
+        if (!field.value.trim()) {
+          field.classList.add('kst-sf-error');
+          valid = false;
+        } else {
+          field.classList.remove('kst-sf-error');
+        }
+      });
+      if (!valid) return;
+
+      const emailVal = emailEl.value.trim();
+
+      // Show success state
+      div.innerHTML = `
+        <div class="kst-sf-success">
+          <div class="kst-sf-success-icon">✅</div>
+          <p><strong>Case submitted successfully!</strong></p>
+          <p>Our KST support team will get back to you at <strong>${emailVal}</strong> shortly.</p>
+        </div>
+      `;
+      conversationMode = 'ended';
+      const input = document.getElementById('kst-chat-input');
+      const sendBtn = document.getElementById('kst-chat-send');
+      input.disabled = true;
+      input.placeholder = 'Chat ended';
+      sendBtn.disabled = true;
+      container.scrollTop = container.scrollHeight;
+      setTimeout(() => appendRestartBtn(), 400);
+    });
+  }
+
+  // ── Send message ─────────────────────────────────────────────────────────────
   async function sendMessage(text) {
     text = (text || '').trim();
-    if (!text || isLoading) return;
+    if (!text || isLoading || conversationMode === 'ended') return;
 
-    const input = document.getElementById('kst-chat-input');
+    const input  = document.getElementById('kst-chat-input');
     const sendBtn = document.getElementById('kst-chat-send');
 
     input.value = '';
     input.style.height = 'auto';
+
+    // ── Special case: "Other Issue" chip ──────────────────────────────────────
+    if (text === 'Other Issue') {
+      history.push({ role: 'user', content: 'I have another issue not listed here.' });
+      appendMessage('user', 'Other Issue');
+      conversationMode = 'other_issue';
+      const botMsg = "Of course! Please explain your issue in detail and I'll do my best to help you.";
+      history.push({ role: 'assistant', content: botMsg });
+      setTimeout(() => appendMessage('bot', botMsg), 300);
+      return;
+    }
 
     history.push({ role: 'user', content: text });
     appendMessage('user', text);
@@ -273,12 +458,23 @@
 
       if (!res.ok) throw new Error('API error ' + res.status);
 
-      const data = await res.json();
+      const data  = await res.json();
       const reply = data.reply || 'Sorry, I could not get a response. Please try again.';
 
       removeTyping();
       appendMessage('bot', reply);
       history.push({ role: 'assistant', content: reply });
+
+      // ── Post-response flow ────────────────────────────────────────────────
+      if (conversationMode === 'other_issue') {
+        // User just explained their issue → ask if resolved
+        conversationMode = 'awaiting_resolution';
+        setTimeout(() => appendResolutionCheck(), 500);
+      } else if (conversationMode !== 'ended') {
+        // Normal Q&A → ask if they have more doubts
+        setTimeout(() => appendFollowUp(), 500);
+      }
+
     } catch (err) {
       removeTyping();
       appendMessage('bot', 'Sorry, something went wrong. Please try again in a moment.');
@@ -308,4 +504,5 @@
   } else {
     init();
   }
+
 })();

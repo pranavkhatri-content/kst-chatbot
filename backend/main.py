@@ -1,14 +1,17 @@
+import os
+from dotenv import load_dotenv
+
+# Load .env FIRST — before any other imports that read env vars at module level
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from dotenv import load_dotenv
 import httpx
-import os
 from typing import List
 from retriever import retrieve, build_context
-
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = "gemini-2.5-flash"
@@ -39,6 +42,13 @@ Guidelines:
 """.strip()
 
 app = FastAPI(title="KST Chatbot RAG API")
+
+# Serve frontend static files (CSS, JS)
+app.mount(
+    "/frontend",
+    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "..", "frontend")),
+    name="frontend",
+)
 
 app.add_middleware(
     CORSMiddleware,
