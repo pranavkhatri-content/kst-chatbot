@@ -5,6 +5,163 @@ Format: [Version] — Date — Author — Branch
 
 ---
 
+## [1.2.0] — 2026-05-22 — Sebastian Krishna — feature/rag-retrieval-optimization
+
+This release optimises the RAG retrieval pipeline across four areas:
+chunk granularity, embedding quality, retrieval precision, and multi-turn context.
+
+---
+
+### 🔧 Change 1 — Split large chunks into focused sub-chunks (20 → 25 chunks)
+
+**Problem:**
+Several knowledge chunks covered multiple distinct topics in a single entry. For example,
+`install_gtm` contained all 5 GTM setup steps (~30 lines), `install_prestashop` covered
+versions 1.6, 1.7 AND 8, and `install_magento` covered both Magento 1 and 2. When these
+chunks are embedded, the resulting vector is a diluted average of all subtopics — causing
+weaker semantic matches when a user asks about a specific step or version.
+
+**Fix — `backend/knowledge_chunks.py`:**
+Split the three worst offenders into focused sub-chunks:
+- `install_gtm` → `install_gtm_overview`, `install_gtm_datalayer`, `install_gtm_tags`
+- `install_prestashop` → `install_prestashop_8_17`, `install_prestashop_16`
+- `install_magento` → `install_magento2`, `install_magento1`
+
+Each sub-chunk now covers a single focused topic, producing tighter embedding vectors
+that match more precisely to user queries.
+
+---
+
+### ✨ Change 2 — Add query preambles for better semantic matching
+
+**Problem:**
+Chunks were embedded using `topic + content`, which reads like documentation. But users
+don't phrase questions like documentation headings — they say things like "my sales aren't
+showing up" or "where is my merchant ID". The embedding model needs to match against how
+users actually speak, not how docs are written.
+
+**Fix — `backend/knowledge_chunks.py` + `backend/ingest.py`:**
+Added a `queries` field to every chunk containing 3–7 anticipated user phrasings:
+
+```python
+# Example from knowledge_chunks.py
+{
+    "id": "troubleshooting_general",
+    "queries": [
+        "KST not working",
+        "no conversions showing",
+        "sales not tracking",
+        "pixel not firing",
+        "zero sales in dashboard",
+    ],
+    ...
+}
+```
+
+In `ingest.py`, the text sent to the embedding model now includes these queries:
+
+```python
+# BEFORE
+text = f"{chunk['topic']}\n\n{chunk['content']}"
+
+# AFTER
+queries_block = "\n".join(chunk.get("queries", []))
+text = f"{chunk['topic']}\n\n{queries_block}\n\n{chunk['content']}"
+```
+
+The stored document (what the LLM reads at answer time) remains unchanged — only the
+embedding vector is enriched.
+
+---
+
+### 🔧 Change 3 — Add distance threshold and reduce top_k (5 → 3)
+
+**Problem:**
+The retriever always returned exactly 5 chunks (`top_k=5`) regardless of relevance. With
+only 20–25 chunks total, this meant 20–25% of the entire knowledge base was injected into
+every prompt. Chunks #4 and #5 were often barely related noise that the LLM had to wade
+through, increasing token cost and risking off-topic answers.
+
+**Fix — `backend/retriever.py`:**
+- Reduced default `top_k` from 5 to 3
+- Added a `max_distance` parameter (default `1.0` for cosine distance) that filters out
+  chunks beyond the threshold — if only 2 results are truly relevant, you get 2 instead
+  of being padded with noise
+- Added debug logging that prints the distance score for each candidate chunk, enabling
+  future threshold tuning
+
+```python
+# BEFORE
+def retrieve(query: str, top_k: int = 5) -> list[dict]:
+
+# AFTER
+def retrieve(query: str, top_k: int = 3, max_distance: float = 1.0) -> list[dict]:
+    ...
+    for doc, meta, dist in zip(...):
+        print(f"  [{round(dist, 4)}] {meta['topic']}")
+        if dist > max_distance:
+            break
+        chunks.append(...)
+```
+
+---
+
+### ✨ Change 4 — Conversational retrieval using multi-turn context
+
+**Problem:**
+Retrieval used only the latest user message. In multi-turn conversations, follow-up
+questions lose their topic context. For example:
+
+```
+User: "How do I install KST on Shopify?"
+Bot:  (explains Shopify steps)
+User: "What about the conversion tag part?"
+```
+
+The follow-up "What about the conversion tag part?" was embedded alone — matching GTM,
+Manual, and Shopify conversion tag chunks equally, because "Shopify" wasn't in the query.
+
+**Fix — `backend/main.py`:**
+The retrieval query now joins the last 3 user messages instead of just the latest one:
+
+```python
+# BEFORE
+latest_user_msg = next(
+    (m.content for m in reversed(request.messages) if m.role == "user"),
+    None,
+)
+chunks = retrieve(latest_user_msg, top_k=5)
+
+# AFTER
+user_messages = [m.content for m in request.messages if m.role == "user"]
+retrieval_query = " ".join(user_messages[-3:])
+chunks = retrieve(retrieval_query, top_k=3)
+```
+
+This means the follow-up query becomes `"How do I install KST on Shopify? What about the
+conversion tag part?"` — which correctly retrieves Shopify-specific conversion tag chunks.
+
+---
+
+### ⚠️ Re-ingestion required
+
+The `chroma_db/` directory has been deleted. After pulling this branch, run:
+
+```bash
+cd backend
+python ingest.py
+```
+
+Or simply run `start.bat`, which detects the missing `chroma_db/` and re-ingests automatically.
+
+**Files changed:**
+- `backend/knowledge_chunks.py` — chunk splits + query preambles
+- `backend/retriever.py` — distance threshold + debug logging
+- `backend/ingest.py` — include queries in embedding text
+- `backend/main.py` — multi-turn retrieval query
+
+---
+
 ## [1.1.0] — 2026-05-21 — Atik Jain — feat/atik-follow-up-sf-form
 
 This release combines two sets of work:
@@ -151,7 +308,7 @@ Clicking it:
 
 ---
 
-## [1.0.0] — Initial Commit — pranavkhatri-content
+## [1.0.0] — Initial Commit — Sebastian Krishna
 
 - FastAPI backend with RAG pipeline (ChromaDB + Google Gemini Embeddings)
 - 21 KST knowledge chunks: installation, troubleshooting, GDPR, attribution, platforms
@@ -194,3 +351,4 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 | `main` | Production — original code | Untouched |
 | `fix/atik-static-files-and-api-key-fix` | Original bug fixes (not merged) | Superseded by below |
 | `feat/atik-follow-up-sf-form` | Bug fixes + all new features | Pending review & merge |
+| `feature/rag-retrieval-optimization` | RAG retrieval pipeline optimization | Pending review & merge |
