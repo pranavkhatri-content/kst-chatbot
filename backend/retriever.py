@@ -74,9 +74,43 @@ def retrieve(query: str, top_k: int = 3, max_distance: float = 1.0) -> list[dict
         })
 
     if not chunks:
-        print(f"  ⚠ All {top_k} results exceeded max_distance={max_distance}")
+        print(f"  ! All {top_k} results exceeded max_distance={max_distance}")
 
     return chunks
+
+
+def retrieve_conversational(latest_query: str, context_query: str,
+                            top_k: int = 3, max_distance: float = 1.0) -> list[dict]:
+    """
+    Dual-query retrieval for multi-turn conversations.
+
+    A single joined query ("What is KST? How do I set up Shopify?") lets the
+    earlier topic dominate the embedding and drown out the current question.
+    Instead, run both queries and merge:
+      - primary:  the latest user message alone -> top 2 (current question wins)
+      - context:  the joined conversation query -> top 2 unseen
+                  (rescues ambiguous follow-ups like "what about the conversion tag?")
+    Returns up to top_k + 1 unique chunks (4 with the default top_k=3).
+    """
+    print(f"  [primary query] {ascii(latest_query)}")
+    primary = retrieve(latest_query, top_k=top_k, max_distance=max_distance)
+    merged = primary[:2]
+    seen = {c["topic"] for c in merged}
+    cap = top_k + 1
+
+    if context_query and context_query.strip() != latest_query.strip():
+        print(f"  [context query] {ascii(context_query)}")
+        for c in retrieve(context_query, top_k=top_k, max_distance=max_distance):
+            if len(merged) >= cap:
+                break
+            if c["topic"] not in seen:
+                merged.append(c)
+                seen.add(c["topic"])
+    else:
+        # Single-turn conversation: primary is the only signal
+        merged = primary
+
+    return merged
 
 
 def build_context(chunks: list[dict]) -> str:

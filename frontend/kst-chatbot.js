@@ -6,8 +6,15 @@
 (function () {
   'use strict';
 
+  // API endpoint: explicit data-api wins; otherwise target /chat on the same
+  // origin that served this script (works on any port/host). When the page is
+  // opened directly from disk (file://) there is no origin — assume the local
+  // dev server.
   const API_URL = (document.currentScript && document.currentScript.dataset.api)
-    || 'http://localhost:8000/chat';
+    || (document.currentScript && document.currentScript.src
+        && document.currentScript.src.startsWith('http')
+        ? new URL('/chat', document.currentScript.src).href
+        : 'http://localhost:8001/chat');
 
   // ── Markdown → HTML (lightweight, no deps) ──────────────────────────────────
   function renderMarkdown(text) {

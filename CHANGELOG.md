@@ -5,6 +5,83 @@ Format: [Version] — Date — Author — Branch
 
 ---
 
+## [1.3.1] — 2026-07-13 — Pranav Khatri — feature/internal-llm-provider-switch
+
+Fixes a multi-turn retrieval bug the internal Gemma model exposed, adds
+comprehensive request/response logging, and hardens the local dev setup.
+
+---
+
+### 🐛 Bug Fix — Follow-up questions retrieved the wrong chunks (dual-query retrieval)
+
+**Symptom:** Asking "What is KST?" then "Shopify setup" made the bot claim it
+didn't know a Shopify solution — the Shopify chunk was never retrieved.
+
+**Root cause:** Since v1.2, the retrieval query joined the last 3 user messages
+into one string. The earlier topic ("What is KST") dominated the embedding and
+drowned out the current question, so retrieval returned Overview/Manual/Testing
+instead of the Shopify chunks. Gemini masked the gap with general knowledge;
+Gemma follows "only use the provided sources" strictly and exposed it.
+
+**Fix — `backend/retriever.py` (`retrieve_conversational`) + `backend/main.py`:**
+Two searches merged instead of one diluted query:
+- **primary** — the latest user message alone → top 2 (current question wins)
+- **context** — the joined conversation → up to 2 more unseen chunks
+  (still rescues ambiguous follow-ups like "what about the conversion tag part?")
+
+Multi-turn requests now inject up to 4 unique chunks; single-turn stays at 3.
+
+---
+
+### ✨ Change 1 — Comprehensive LLM logging (raw input + raw output)
+
+**`backend/main.py`:**
+Every request now logs to the server console:
+- `[RAG]` primary/context retrieval queries, chunk distances, injected topics
+- `LLM REQUEST` — provider, model, URL, and the full raw JSON payload
+- `LLM RESPONSE` — elapsed time, full raw response JSON (llama.cpp's bulky
+  `__verbose` block stripped), the internal model's hidden reasoning, and the
+  extracted reply sent to the widget
+
+Also fixed a crash this exposed: the Windows console (cp1252) can't print
+Unicode box/arrow characters — all log output is now ASCII-safe.
+
+---
+
+### ✨ Change 2 — Output token cap
+
+**`backend/main.py` + `.env.example`:**
+New `MAX_OUTPUT_TOKENS` setting (default 10000) applied to both providers
+(`max_tokens` for llama.cpp, `generationConfig.maxOutputTokens` for Gemini).
+For the internal reasoning model the cap includes hidden thinking tokens.
+Guards against runaway generations on the slow internal server.
+
+---
+
+### 🔧 Change 3 — Port-agnostic widget + port 8001
+
+**Problem:** `demo.html` hardcoded `data-api="http://localhost:8000/chat"`, so
+the widget always posted to port 8000 regardless of where the server ran. A
+ghost Windows process holding port 8000 (running stale code) made every test
+hit the old build — the v1.1.0 ghost-port issue struck again.
+
+**Fix — `frontend/kst-chatbot.js` + `demo.html` + `start.bat`:**
+- The widget now derives its API endpoint from the script's own origin
+  (`/chat` on whatever host/port served the page); explicit `data-api` still wins
+- Opening `demo.html` directly from disk (file://) falls back to
+  `http://localhost:8001/chat`
+- `start.bat` moved to port **8001** to dodge the ghost until the next reboot
+
+**Files changed:**
+- `backend/retriever.py` — dual-query conversational retrieval
+- `backend/main.py` — retrieval wiring, raw request/response logging, token cap
+- `frontend/kst-chatbot.js` — origin-derived API URL
+- `demo.html` — removed hardcoded API port
+- `start.bat` — port 8001
+- `.env.example` — MAX_OUTPUT_TOKENS
+
+---
+
 ## [1.3.0] — 2026-07-13 — Pranav Khatri — feature/internal-llm-provider-switch
 
 This release removes the paid-API dependency for embeddings and adds a switchable
