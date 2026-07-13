@@ -2,37 +2,23 @@
 ingest.py — Run this once (or whenever knowledge_chunks.py changes) to
 embed all KST knowledge chunks and store them in ChromaDB.
 
+Embeddings run fully locally via sentence-transformers — no API key needed.
+
 Usage:
     python ingest.py
 """
 
 import os
-import httpx
 import chromadb
 from dotenv import load_dotenv
 from knowledge_chunks import CHUNKS
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-EMBED_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models"
-    "/gemini-embedding-001:embedContent"
-)
+# Reuse the exact same embedder as retrieval so vectors always match
+from retriever import embed_query as get_embedding
+
 CHROMA_PATH = os.path.join(os.path.dirname(__file__), "..", "chroma_db")
-
-
-def get_embedding(text: str) -> list[float]:
-    """Call Google text-embedding-004 to get a vector for the given text."""
-    resp = httpx.post(
-        EMBED_URL,
-        params={"key": GEMINI_API_KEY},
-        json={"model": "models/gemini-embedding-001", "content": {"parts": [{"text": text}]}},
-        timeout=30,
-    )
-    if resp.status_code != 200:
-        raise RuntimeError(f"Embedding error {resp.status_code}: {resp.text}")
-    return resp.json()["embedding"]["values"]
 
 
 def main():
@@ -51,7 +37,7 @@ def main():
         metadata={"hnsw:space": "cosine"},
     )
 
-    print(f"Embedding {len(CHUNKS)} chunks...")
+    print(f"Embedding {len(CHUNKS)} chunks locally...")
     ids, embeddings, documents, metadatas = [], [], [], []
 
     for i, chunk in enumerate(CHUNKS):

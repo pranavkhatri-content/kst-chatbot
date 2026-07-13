@@ -31,6 +31,7 @@
   right: 28px;
   width: 400px;
   height: 580px;
+  max-height: calc(100dvh - 120px); /* never clip the header on short screens */
   border-radius: 20px;
   box-shadow: 0 12px 48px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.08);
   display: flex;
@@ -97,11 +98,27 @@
 #kst-chat-header .kst-subtitle { font-size: 11px; opacity: 0.8; margin-top: 1px; }
 
 #kst-chat-header .kst-header-actions {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 2px;
 }
+
+/* Model picker (testing) */
+#kst-model-picker {
+  margin-left: auto;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.35);
+  color: #fff;
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  outline: none;
+  max-width: 130px;
+  flex-shrink: 0;
+}
+#kst-model-picker option { color: #333; background: #fff; }
+#kst-model-picker:hover { background: rgba(255,255,255,0.25); }
 #kst-chat-expand,
 #kst-chat-close {
   background: none;

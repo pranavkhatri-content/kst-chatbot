@@ -13,8 +13,21 @@ import httpx
 from typing import List
 from retriever import retrieve, build_context
 
+# ── LLM provider switch ──────────────────────────────────────────────────────
+# "gemini"   → Google Gemini API (paid, requires GEMINI_API_KEY)
+# "internal" → Kelkoo internal llama.cpp server (free, OpenAI-compatible)
+# Set in .env — switch anytime, no code changes needed.
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "gemini").lower()
+
+# Internal Kelkoo LLM served by llama.cpp (OpenAI-compatible API)
+LLM_BASE_URL = os.environ.get(
+    "LLM_BASE_URL", "http://dc1-kdp-dev-worker-01.dev.dc1.kelkoo.net:8100/v1"
+)
+LLM_MODEL = os.environ.get("LLM_MODEL", "gemma-4-26B-A4B-it-UD-Q3_K_M.gguf")
+
+# Google Gemini
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_URL = (
     f"https://generativelanguage.googleapis.com/v1beta/models"
     f"/{GEMINI_MODEL}:generateContent"
@@ -65,6 +78,7 @@ class Message(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: List[Message]
+    provider: str | None = None  # optional per-request override: "gemini" | "internal"
 
 
 class ChatResponse(BaseModel):
@@ -83,7 +97,8 @@ async def chat(request: ChatRequest):
 
     retrieval_query = " ".join(user_messages[-3:])
 
-    async with httpx.AsyncClient(timeout=30) as client:
+    # Local 26B model can take a while on long prompts — generous timeout
+    async with httpx.AsyncClient(timeout=120) as client:
         chunks = retrieve(retrieval_query, top_k=3)
         context = build_context(chunks)
 
@@ -96,29 +111,54 @@ async def chat(request: ChatRequest):
 
         # ── 3. Build conversation history (last 20 messages) ─────────────────
         history = request.messages[-20:]
-        contents = []
-        for msg in history:
-            role = "model" if msg.role == "assistant" else "user"
-            contents.append({"role": role, "parts": [{"text": msg.content}]})
 
-        payload = {
-            "system_instruction": {"parts": [{"text": system_prompt}]},
-            "contents": contents,
-        }
+        # ── 4. Call the selected LLM provider ────────────────────────────────
+        # Per-request override (from the widget's model picker) wins over .env
+        provider = (request.provider or LLM_PROVIDER).lower()
+        if provider not in ("gemini", "internal"):
+            provider = LLM_PROVIDER
+        active_model = LLM_MODEL if provider == "internal" else GEMINI_MODEL
+        print(f"[LLM] provider={provider} model={active_model}")
+        if provider == "internal":
+            # Kelkoo internal llama.cpp server (OpenAI-compatible)
+            oai_messages = [{"role": "system", "content": system_prompt}]
+            for msg in history:
+                role = "assistant" if msg.role == "assistant" else "user"
+                oai_messages.append({"role": role, "content": msg.content})
 
-        # ── 4. Call Gemini ────────────────────────────────────────────────────
-        resp = await client.post(
-            GEMINI_URL,
-            params={"key": GEMINI_API_KEY},
-            json=payload,
-        )
+            resp = await client.post(
+                f"{LLM_BASE_URL}/chat/completions",
+                json={
+                    "model": LLM_MODEL,
+                    "messages": oai_messages,
+                    "temperature": 0.2,
+                },
+            )
+            if resp.status_code != 200:
+                print(f"[Internal LLM Error] {resp.status_code}: {resp.text}")
+                raise HTTPException(status_code=502, detail=resp.text)
+            reply = resp.json()["choices"][0]["message"]["content"]
 
-    if resp.status_code != 200:
-        print(f"[Gemini Error] {resp.status_code}: {resp.text}")
-        raise HTTPException(status_code=502, detail=resp.text)
+        else:
+            # Google Gemini API
+            contents = []
+            for msg in history:
+                role = "model" if msg.role == "assistant" else "user"
+                contents.append({"role": role, "parts": [{"text": msg.content}]})
 
-    data = resp.json()
-    reply = data["candidates"][0]["content"]["parts"][0]["text"]
+            resp = await client.post(
+                GEMINI_URL,
+                params={"key": GEMINI_API_KEY},
+                json={
+                    "system_instruction": {"parts": [{"text": system_prompt}]},
+                    "contents": contents,
+                },
+            )
+            if resp.status_code != 200:
+                print(f"[Gemini Error] {resp.status_code}: {resp.text}")
+                raise HTTPException(status_code=502, detail=resp.text)
+            reply = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+
     return ChatResponse(reply=reply)
 
 

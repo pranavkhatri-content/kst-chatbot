@@ -1,22 +1,20 @@
 """
-retriever.py — Given a user query, embed it and find the top-k most
+retriever.py — Given a user query, embed it locally and find the top-k most
 relevant KST knowledge chunks from ChromaDB.
+
+Embeddings run fully locally via sentence-transformers — no API calls, no cost.
 """
 
 import os
-import httpx
 import chromadb
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-EMBED_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models"
-    "/gemini-embedding-001:embedContent"
-)
 CHROMA_PATH = os.path.join(os.path.dirname(__file__), "..", "chroma_db")
+EMBED_MODEL_NAME = os.environ.get("EMBED_MODEL", "all-MiniLM-L6-v2")
 
-# Lazy-load the client and collection
+# Lazy-load the client, collection and embedding model
 _client = None
 _collection = None
+_embedder = None
 
 
 def _get_collection():
@@ -27,16 +25,18 @@ def _get_collection():
     return _collection
 
 
+def _get_embedder():
+    global _embedder
+    if _embedder is None:
+        # Imported here so the model only loads when first needed
+        # (first ever run downloads ~80MB from HuggingFace, then cached locally)
+        from sentence_transformers import SentenceTransformer
+        _embedder = SentenceTransformer(EMBED_MODEL_NAME)
+    return _embedder
+
+
 def embed_query(text: str) -> list[float]:
-    resp = httpx.post(
-        EMBED_URL,
-        params={"key": GEMINI_API_KEY},
-        json={"model": "models/gemini-embedding-001", "content": {"parts": [{"text": text}]}},
-        timeout=30,
-    )
-    if resp.status_code != 200:
-        raise RuntimeError(f"Embedding error {resp.status_code}: {resp.text}")
-    return resp.json()["embedding"]["values"]
+    return _get_embedder().encode(text, normalize_embeddings=True).tolist()
 
 
 def retrieve(query: str, top_k: int = 3, max_distance: float = 1.0) -> list[dict]:

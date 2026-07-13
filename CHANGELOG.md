@@ -5,6 +5,87 @@ Format: [Version] — Date — Author — Branch
 
 ---
 
+## [1.3.0] — 2026-07-13 — Pranav Khatri — feature/internal-llm-provider-switch
+
+This release removes the paid-API dependency for embeddings and adds a switchable
+LLM provider so the chatbot can run on either Google Gemini or Kelkoo's internal
+Gemma server.
+
+---
+
+### ✨ Change 1 — Embeddings moved from Gemini API to local sentence-transformers
+
+**Problem:**
+Every question triggered a paid Gemini Embedding API call (plus one call per chunk
+at ingest time). This was the largest driver of API cost since it fired on every
+single request.
+
+**Fix — `backend/retriever.py` + `backend/ingest.py`:**
+Embeddings now run fully locally via `sentence-transformers` (`all-MiniLM-L6-v2`,
+configurable via `EMBED_MODEL` in `.env`). No API key, no cost, no network call.
+`ingest.py` reuses the exact same embedder as retrieval so vectors always match.
+
+⚠ **Re-ingestion required** — the embedding model changed, so old vectors are
+invalid. Delete `chroma_db/` and run `python ingest.py` (or `start.bat` does it
+automatically).
+
+Note: first request after server start loads the embedding model into memory
+(~2-5s one-time delay). First ever run downloads the model (~80MB) from HuggingFace.
+
+---
+
+### ✨ Change 2 — Switchable LLM provider (Gemini ⇄ internal Gemma)
+
+**`backend/main.py`:**
+- New `LLM_PROVIDER` setting in `.env`: `"gemini"` (default) or `"internal"`
+- `"internal"` calls Kelkoo's llama.cpp server (OpenAI-compatible API) at
+  `LLM_BASE_URL` with model `LLM_MODEL` — currently
+  `gemma-4-26B-A4B-it-UD-Q3_K_M.gguf` on `dc1-kdp-dev-worker-01`
+- The `/chat` endpoint also accepts an optional per-request `provider` field that
+  overrides the `.env` default (used by the widget's model picker)
+- Every request logs which provider/model answered: `[LLM] provider=... model=...`
+- Internal model runs with `temperature: 0.2` for factual answers
+
+**Known limitation:** the internal Gemma server (CPU, reasoning model) currently
+takes ~38s per answer vs ~5s for Gemini. Raised with the data science team
+(GPU offload + `--reasoning-budget 0` would bring it to ~2-4s).
+
+---
+
+### ✨ Change 3 — Model picker in the widget header (testing)
+
+**`frontend/kst-chatbot.js` + `frontend/kst-chatbot.css`:**
+A dropdown in the chat header lets you switch between "Gemini" and
+"Gemma (internal)" per conversation, for side-by-side comparison. The selection
+is sent as `provider` with each `/chat` request. Switching posts a confirmation
+message in the chat.
+
+---
+
+### 🐛 Bug Fix — Chat header invisible on short screens
+
+**Symptom:** On viewports shorter than ~680px, the widget's entire header
+(title, expand/close buttons, model picker) was pushed above the visible screen.
+
+**Root cause:** `#kst-chat-window` had a hardcoded `height: 580px` with
+`bottom: 96px` — on short screens the window extended past the viewport top.
+
+**Fix — `frontend/kst-chatbot.css`:**
+Added `max-height: calc(100dvh - 120px)` so the window always fits the viewport.
+
+---
+
+**Files changed:**
+- `backend/retriever.py` — local embeddings
+- `backend/ingest.py` — local embeddings, reuses retriever's embedder
+- `backend/main.py` — provider switch + per-request override + logging
+- `backend/requirements.txt` — added sentence-transformers
+- `frontend/kst-chatbot.js` — model picker
+- `frontend/kst-chatbot.css` — picker styles + max-height fix
+- `.env.example` — new configuration keys
+
+---
+
 ## [1.2.0] — 2026-05-22 — Sebastian Krishna — feature/rag-retrieval-optimization
 
 This release optimises the RAG retrieval pipeline across four areas:
