@@ -22,6 +22,9 @@ CHUNKS = [
             "how does KST work",
             "what are the lead tag and conversion tag",
             "what do I need to install for tracking",
+            "KST overview",
+            "explain Kelkoo Sales Tracking to me",
+            "what does KST do",
         ],
         "content": """
 What is KST?
@@ -46,6 +49,9 @@ KST also functions as a Master Tag, similar to Google Tag Manager — it can hos
             "how long does the cookie last",
             "last click attribution",
             "why do my numbers differ from Google Analytics",
+            "do I get credit if a customer converts through another channel later",
+            "will I still get the sale if someone clicks elsewhere before buying",
+            "who gets credit for the sale when multiple channels are involved",
         ],
         "content": """
 Attribution Model:
@@ -66,6 +72,9 @@ KST uses a Kelkoo Channel Last Click attribution model with a 30-day conversion 
             "KST privacy policy",
             "what data does KST collect",
             "cookie consent requirements",
+            "what personal data does the tracking pixel collect",
+            "where is my customer data stored",
+            "what information does the KST pixel gather about visitors",
         ],
         "content": """
 Privacy & GDPR:
@@ -156,6 +165,7 @@ Always remove previous Kelkoo tracking first:
             "Google Tag Manager setup for KST",
             "GTM installation steps overview",
             "can I use GTM for Kelkoo tracking",
+            "how do I set up sales tracking with Google Tag Manager",
         ],
         "content": """
 GTM Installation (Google Tag Manager) — Recommended Method:
@@ -243,6 +253,10 @@ Step 5 — Install the Kelkoo Lead Tag:
             "add KST tracking code to my website",
             "KST code snippet for any platform",
             "how to add the lead tag and conversion tag manually",
+            "how do I set up sales tracking without a plugin",
+            "my website isn't built on Shopify WooCommerce or any known platform",
+            "I have a custom-built website, not on a standard platform",
+            "can I hard-code the tracking myself with no platform or plugin",
         ],
         "content": """
 Manual Installation (any platform):
@@ -287,6 +301,8 @@ Multiple campaigns: merchantInfo: [{ country: 'fr', merchantId: '12941513' }, { 
             "Shopify custom pixel for Kelkoo",
             "Shopify customer events tracking",
             "Kelkoo tracking on Shopify",
+            "how do I set up sales tracking on Shopify",
+            "I'm on Shopify how do I set up tracking",
         ],
         "content": """
 Shopify / Shopify Plus Installation:
@@ -347,6 +363,8 @@ analytics.subscribe("checkout_completed", event => {
             "WooCommerce Kelkoo plugin",
             "WordPress KST tracking setup",
             "Kelkoo WooCommerce plugin settings",
+            "how do I set up sales tracking on WooCommerce",
+            "I'm on WooCommerce how do I set up tracking",
         ],
         "content": """
 WooCommerce (WordPress Plugin) Installation:
@@ -381,6 +399,8 @@ Configure:
             "PrestaShop KST tracking setup",
             "Kelkoo tracking for PrestaShop",
             "PrestaShop head.tpl lead tag",
+            "how do I set up sales tracking on PrestaShop",
+            "I'm on PrestaShop 8 how do I set up tracking",
         ],
         "content": """
 PrestaShop Installation (versions 8 and 1.7):
@@ -413,6 +433,7 @@ Note: reinstallation required after any PrestaShop or theme updates.
             "PrestaShop 1.6 Kelkoo tracking",
             "PrestaShop 1.6 header.tpl lead tag",
             "PrestaShop 1.6 PayPal module KST",
+            "how do I set up sales tracking on PrestaShop 1.6",
         ],
         "content": """
 PrestaShop 1.6 Installation:
@@ -435,6 +456,9 @@ PayPal module: If PayPal enabled, apply same changes to /modules/paypal/controll
             "Magento 2 Kelkoo tracking module",
             "Magento 2 lead tag XML layout",
             "Kelkoo module for Magento 2",
+            "how do I set up sales tracking on Magento 2",
+            "I'm on Magento 2 how do I set up tracking",
+            "I use Magento 2 for my store how do I track sales",
         ],
         "content": """
 Magento 2 Installation (up to version 2.3):
@@ -459,6 +483,8 @@ Conversion Tag:
             "Magento 1 Kelkoo tracking",
             "Magento 1 checkout success.phtml",
             "Magento 1 XML layout lead tag",
+            "how do I set up sales tracking on Magento 1",
+            "I'm on Magento 1 how do I set up tracking",
         ],
         "content": """
 Magento 1 Installation:
@@ -477,6 +503,8 @@ Conversion Tag: Edit web/app/design/frontend/custom/default/template/checkout/su
             "install KST on LightSpeed",
             "LightSpeed C-Series Kelkoo tracking",
             "LightSpeed web extras tracking code",
+            "how do I set up sales tracking on LightSpeed",
+            "I'm on LightSpeed how do I set up tracking",
         ],
         "content": """
 LightSpeed C-Series Installation:
@@ -503,6 +531,8 @@ Step 4: Save and run a test purchase to verify tracking.
             "install KST on Unas",
             "Unas ecommerce Kelkoo tracking",
             "Unas marketing external systems",
+            "how do I set up sales tracking on Unas",
+            "I'm on Unas how do I set up tracking",
         ],
         "content": """
 Unas Ecommerce Installation:
@@ -526,6 +556,7 @@ Multiple campaigns: Go to Settings → Texts, Languages → Setting languages, a
             "KST API integration",
             "server side Kelkoo tracking",
             "advanced KST setup",
+            "how do I set up sales tracking server to server",
         ],
         "content": """
 Server-to-Server Implementation (Advanced):
@@ -581,6 +612,9 @@ Primary debugging tool: https://merchant.kelkoogroup.com/app/campaign/sales-trac
             "troubleshoot KST",
             "KST debugging",
             "zero sales in dashboard",
+            "my tracking is completely broken and I'm losing money",
+            "the pixel never fires and no sales are being recorded at all",
+            "everything is broken, nothing is tracking, fix this",
         ],
         "content": """
 General Troubleshooting Checklist (All Platforms):

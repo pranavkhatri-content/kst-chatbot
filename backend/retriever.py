@@ -9,7 +9,7 @@ import os
 import chromadb
 
 CHROMA_PATH = os.path.join(os.path.dirname(__file__), "..", "chroma_db")
-EMBED_MODEL_NAME = os.environ.get("EMBED_MODEL", "all-MiniLM-L6-v2")
+EMBED_MODEL_NAME = os.environ.get("EMBED_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
 
 # Lazy-load the client, collection and embedding model
 _client = None
@@ -43,38 +43,58 @@ def retrieve(query: str, top_k: int = 3, max_distance: float = 1.0) -> list[dict
     """
     Returns up to top_k relevant chunks whose cosine distance is below
     max_distance.  Each result dict contains:
-      - content  (str)
-      - topic    (str)
-      - doc_url  (str)
-      - score    (float, lower = more similar for cosine distance)
+      - content   (str)
+      - chunk_id  (str)
+      - topic     (str)
+      - doc_url   (str)
+      - score     (float, lower = more similar for cosine distance)
+
+    Each chunk is indexed as MULTIPLE vectors (topic + every anticipated
+    query phrasing — see ingest.py). This over-fetches raw vector matches,
+    then collapses to the single best-scoring vector per chunk_id before
+    applying top_k, so a chunk isn't penalised just because only one of its
+    several phrasings matched.
     """
     collection = _get_collection()
     query_emb = embed_query(query)
 
+    n_results = min(collection.count(), max(top_k * 12, 30))
     results = collection.query(
         query_embeddings=[query_emb],
-        n_results=top_k,
+        n_results=n_results,
         include=["documents", "metadatas", "distances"],
     )
 
-    chunks = []
+    best_per_chunk: dict[str, tuple] = {}
     for doc, meta, dist in zip(
         results["documents"][0],
         results["metadatas"][0],
         results["distances"][0],
     ):
-        print(f"  [{round(dist, 4)}] {meta['topic']}")
-        if dist > max_distance:
+        cid = meta["chunk_id"]
+        if cid not in best_per_chunk or dist < best_per_chunk[cid][2]:
+            best_per_chunk[cid] = (doc, meta, dist)
+
+    ranked = sorted(best_per_chunk.values(), key=lambda x: x[2])
+
+    chunks = []
+    for doc, meta, dist in ranked:
+        if len(chunks) >= top_k:
             break
+        if dist > max_distance:
+            print(f"  [{round(dist, 4)}] SKIP {meta['topic']} (over threshold)")
+            break
+        print(f"  [{round(dist, 4)}] {meta['topic']}")
         chunks.append({
             "content": doc,
+            "chunk_id": meta.get("chunk_id"),
             "topic": meta["topic"],
             "doc_url": meta["doc_url"],
             "score": round(dist, 4),
         })
 
     if not chunks:
-        print(f"  ! All {top_k} results exceeded max_distance={max_distance}")
+        print(f"  ! All results exceeded max_distance={max_distance}")
 
     return chunks
 
@@ -95,7 +115,7 @@ def retrieve_conversational(latest_query: str, context_query: str,
     print(f"  [primary query] {ascii(latest_query)}")
     primary = retrieve(latest_query, top_k=top_k, max_distance=max_distance)
     merged = primary[:2]
-    seen = {c["topic"] for c in merged}
+    seen = {c["chunk_id"] for c in merged}
     cap = top_k + 1
 
     if context_query and context_query.strip() != latest_query.strip():
@@ -103,9 +123,9 @@ def retrieve_conversational(latest_query: str, context_query: str,
         for c in retrieve(context_query, top_k=top_k, max_distance=max_distance):
             if len(merged) >= cap:
                 break
-            if c["topic"] not in seen:
+            if c["chunk_id"] not in seen:
                 merged.append(c)
-                seen.add(c["topic"])
+                seen.add(c["chunk_id"])
     else:
         # Single-turn conversation: primary is the only signal
         merged = primary

@@ -26,7 +26,7 @@ LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "gemini").lower()
 LLM_BASE_URL = os.environ.get(
     "LLM_BASE_URL", "http://dc1-kdp-dev-worker-01.dev.dc1.kelkoo.net:8100/v1"
 )
-LLM_MODEL = os.environ.get("LLM_MODEL", "gemma-4-26B-A4B-it-UD-Q3_K_M.gguf")
+LLM_MODEL = os.environ.get("LLM_MODEL", "gemma-4-E4B-it-BF16.gguf")
 
 # Google Gemini
 # Hard cap on generated tokens per answer (includes the internal model's
@@ -113,6 +113,19 @@ def _log_llm_response(provider: str, model: str, elapsed: float,
     _safe_print("=" * 70 + "\n")
 
 
+def build_system_prompt(context: str) -> str:
+    """Assemble the full system prompt with retrieved doc context.
+
+    Shared with the eval harness (eval/run_eval.py) so tests always exercise
+    the exact prompt production uses.
+    """
+    return (
+        BASE_SYSTEM_PROMPT
+        + "\n\n---\n\n## Relevant KST Documentation (retrieved for this query)\n\n"
+        + context
+    )
+
+
 class Message(BaseModel):
     role: str   # "user" or "assistant"
     content: str
@@ -151,11 +164,7 @@ async def chat(request: ChatRequest):
         context = build_context(chunks)
 
         # ── 2. Build dynamic system prompt with retrieved context ────────────
-        system_prompt = (
-            BASE_SYSTEM_PROMPT
-            + "\n\n---\n\n## Relevant KST Documentation (retrieved for this query)\n\n"
-            + context
-        )
+        system_prompt = build_system_prompt(context)
 
         # ── 3. Build conversation history (last 20 messages) ─────────────────
         history = request.messages[-20:]
