@@ -5,6 +5,164 @@ Format: [Version] — Date — Author — Branch
 
 ---
 
+## [1.3.1] — 2026-07-13 — Pranav Khatri — feature/internal-llm-provider-switch
+
+Fixes a multi-turn retrieval bug the internal Gemma model exposed, adds
+comprehensive request/response logging, and hardens the local dev setup.
+
+---
+
+### 🐛 Bug Fix — Follow-up questions retrieved the wrong chunks (dual-query retrieval)
+
+**Symptom:** Asking "What is KST?" then "Shopify setup" made the bot claim it
+didn't know a Shopify solution — the Shopify chunk was never retrieved.
+
+**Root cause:** Since v1.2, the retrieval query joined the last 3 user messages
+into one string. The earlier topic ("What is KST") dominated the embedding and
+drowned out the current question, so retrieval returned Overview/Manual/Testing
+instead of the Shopify chunks. Gemini masked the gap with general knowledge;
+Gemma follows "only use the provided sources" strictly and exposed it.
+
+**Fix — `backend/retriever.py` (`retrieve_conversational`) + `backend/main.py`:**
+Two searches merged instead of one diluted query:
+- **primary** — the latest user message alone → top 2 (current question wins)
+- **context** — the joined conversation → up to 2 more unseen chunks
+  (still rescues ambiguous follow-ups like "what about the conversion tag part?")
+
+Multi-turn requests now inject up to 4 unique chunks; single-turn stays at 3.
+
+---
+
+### ✨ Change 1 — Comprehensive LLM logging (raw input + raw output)
+
+**`backend/main.py`:**
+Every request now logs to the server console:
+- `[RAG]` primary/context retrieval queries, chunk distances, injected topics
+- `LLM REQUEST` — provider, model, URL, and the full raw JSON payload
+- `LLM RESPONSE` — elapsed time, full raw response JSON (llama.cpp's bulky
+  `__verbose` block stripped), the internal model's hidden reasoning, and the
+  extracted reply sent to the widget
+
+Also fixed a crash this exposed: the Windows console (cp1252) can't print
+Unicode box/arrow characters — all log output is now ASCII-safe.
+
+---
+
+### ✨ Change 2 — Output token cap
+
+**`backend/main.py` + `.env.example`:**
+New `MAX_OUTPUT_TOKENS` setting (default 10000) applied to both providers
+(`max_tokens` for llama.cpp, `generationConfig.maxOutputTokens` for Gemini).
+For the internal reasoning model the cap includes hidden thinking tokens.
+Guards against runaway generations on the slow internal server.
+
+---
+
+### 🔧 Change 3 — Port-agnostic widget + port 8001
+
+**Problem:** `demo.html` hardcoded `data-api="http://localhost:8000/chat"`, so
+the widget always posted to port 8000 regardless of where the server ran. A
+ghost Windows process holding port 8000 (running stale code) made every test
+hit the old build — the v1.1.0 ghost-port issue struck again.
+
+**Fix — `frontend/kst-chatbot.js` + `demo.html` + `start.bat`:**
+- The widget now derives its API endpoint from the script's own origin
+  (`/chat` on whatever host/port served the page); explicit `data-api` still wins
+- Opening `demo.html` directly from disk (file://) falls back to
+  `http://localhost:8001/chat`
+- `start.bat` moved to port **8001** to dodge the ghost until the next reboot
+
+**Files changed:**
+- `backend/retriever.py` — dual-query conversational retrieval
+- `backend/main.py` — retrieval wiring, raw request/response logging, token cap
+- `frontend/kst-chatbot.js` — origin-derived API URL
+- `demo.html` — removed hardcoded API port
+- `start.bat` — port 8001
+- `.env.example` — MAX_OUTPUT_TOKENS
+
+---
+
+## [1.3.0] — 2026-07-13 — Pranav Khatri — feature/internal-llm-provider-switch
+
+This release removes the paid-API dependency for embeddings and adds a switchable
+LLM provider so the chatbot can run on either Google Gemini or Kelkoo's internal
+Gemma server.
+
+---
+
+### ✨ Change 1 — Embeddings moved from Gemini API to local sentence-transformers
+
+**Problem:**
+Every question triggered a paid Gemini Embedding API call (plus one call per chunk
+at ingest time). This was the largest driver of API cost since it fired on every
+single request.
+
+**Fix — `backend/retriever.py` + `backend/ingest.py`:**
+Embeddings now run fully locally via `sentence-transformers` (`all-MiniLM-L6-v2`,
+configurable via `EMBED_MODEL` in `.env`). No API key, no cost, no network call.
+`ingest.py` reuses the exact same embedder as retrieval so vectors always match.
+
+⚠ **Re-ingestion required** — the embedding model changed, so old vectors are
+invalid. Delete `chroma_db/` and run `python ingest.py` (or `start.bat` does it
+automatically).
+
+Note: first request after server start loads the embedding model into memory
+(~2-5s one-time delay). First ever run downloads the model (~80MB) from HuggingFace.
+
+---
+
+### ✨ Change 2 — Switchable LLM provider (Gemini ⇄ internal Gemma)
+
+**`backend/main.py`:**
+- New `LLM_PROVIDER` setting in `.env`: `"gemini"` (default) or `"internal"`
+- `"internal"` calls Kelkoo's llama.cpp server (OpenAI-compatible API) at
+  `LLM_BASE_URL` with model `LLM_MODEL` — currently
+  `gemma-4-26B-A4B-it-UD-Q3_K_M.gguf` on `dc1-kdp-dev-worker-01`
+- The `/chat` endpoint also accepts an optional per-request `provider` field that
+  overrides the `.env` default (used by the widget's model picker)
+- Every request logs which provider/model answered: `[LLM] provider=... model=...`
+- Internal model runs with `temperature: 0.2` for factual answers
+
+**Known limitation:** the internal Gemma server (CPU, reasoning model) currently
+takes ~38s per answer vs ~5s for Gemini. Raised with the data science team
+(GPU offload + `--reasoning-budget 0` would bring it to ~2-4s).
+
+---
+
+### ✨ Change 3 — Model picker in the widget header (testing)
+
+**`frontend/kst-chatbot.js` + `frontend/kst-chatbot.css`:**
+A dropdown in the chat header lets you switch between "Gemini" and
+"Gemma (internal)" per conversation, for side-by-side comparison. The selection
+is sent as `provider` with each `/chat` request. Switching posts a confirmation
+message in the chat.
+
+---
+
+### 🐛 Bug Fix — Chat header invisible on short screens
+
+**Symptom:** On viewports shorter than ~680px, the widget's entire header
+(title, expand/close buttons, model picker) was pushed above the visible screen.
+
+**Root cause:** `#kst-chat-window` had a hardcoded `height: 580px` with
+`bottom: 96px` — on short screens the window extended past the viewport top.
+
+**Fix — `frontend/kst-chatbot.css`:**
+Added `max-height: calc(100dvh - 120px)` so the window always fits the viewport.
+
+---
+
+**Files changed:**
+- `backend/retriever.py` — local embeddings
+- `backend/ingest.py` — local embeddings, reuses retriever's embedder
+- `backend/main.py` — provider switch + per-request override + logging
+- `backend/requirements.txt` — added sentence-transformers
+- `frontend/kst-chatbot.js` — model picker
+- `frontend/kst-chatbot.css` — picker styles + max-height fix
+- `.env.example` — new configuration keys
+
+---
+
 ## [1.2.0] — 2026-05-22 — Sebastian Krishna — feature/rag-retrieval-optimization
 
 This release optimises the RAG retrieval pipeline across four areas:

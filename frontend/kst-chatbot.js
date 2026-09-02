@@ -6,8 +6,15 @@
 (function () {
   'use strict';
 
+  // API endpoint: explicit data-api wins; otherwise target /chat on the same
+  // origin that served this script (works on any port/host). When the page is
+  // opened directly from disk (file://) there is no origin — assume the local
+  // dev server.
   const API_URL = (document.currentScript && document.currentScript.dataset.api)
-    || 'http://localhost:8000/chat';
+    || (document.currentScript && document.currentScript.src
+        && document.currentScript.src.startsWith('http')
+        ? new URL('/chat', document.currentScript.src).href
+        : 'http://localhost:8001/chat');
 
   // ── Markdown → HTML (lightweight, no deps) ──────────────────────────────────
   function renderMarkdown(text) {
@@ -54,6 +61,8 @@
   let isExpanded = false;
   // 'normal' | 'other_issue' | 'awaiting_resolution' | 'ended'
   let conversationMode = 'normal';
+  // Model picker (testing) — 'gemini' | 'internal', sent with every request
+  let selectedProvider = 'internal';
 
   // ── SVG Icons ────────────────────────────────────────────────────────────────
   const ICON_EXPAND   = `<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>`;
@@ -95,6 +104,10 @@
           <div class="kst-title">KST Support</div>
           <div class="kst-subtitle">Kelkoo Sales Tracking Assistant · RAG</div>
         </div>
+        <select id="kst-model-picker" aria-label="Choose AI model" title="Choose AI model (testing)">
+          <option value="gemini">Gemini</option>
+          <option value="internal" selected>Gemma (internal)</option>
+        </select>
         <div class="kst-header-actions">
           <button id="kst-chat-expand" aria-label="Expand chat">${ICON_EXPAND}</button>
           <button id="kst-chat-close" aria-label="Close chat">
@@ -128,6 +141,12 @@
     fab.addEventListener('click', toggleChat);
     win.querySelector('#kst-chat-close').addEventListener('click', toggleChat);
     win.querySelector('#kst-chat-expand').addEventListener('click', toggleExpand);
+
+    win.querySelector('#kst-model-picker').addEventListener('change', (e) => {
+      selectedProvider = e.target.value;
+      const label = e.target.options[e.target.selectedIndex].text;
+      appendMessage('bot', `Switched to **${label}** — answers now come from this model.`);
+    });
 
     const input = win.querySelector('#kst-chat-input');
     const sendBtn = win.querySelector('#kst-chat-send');
@@ -453,7 +472,7 @@
       const res = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify({ messages: history, provider: selectedProvider }),
       });
 
       if (!res.ok) throw new Error('API error ' + res.status);

@@ -2,37 +2,23 @@
 ingest.py — Run this once (or whenever knowledge_chunks.py changes) to
 embed all KST knowledge chunks and store them in ChromaDB.
 
+Embeddings run fully locally via sentence-transformers — no API key needed.
+
 Usage:
     python ingest.py
 """
 
 import os
-import httpx
 import chromadb
 from dotenv import load_dotenv
 from knowledge_chunks import CHUNKS
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-EMBED_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models"
-    "/gemini-embedding-001:embedContent"
-)
+# Reuse the exact same embedder as retrieval so vectors always match
+from retriever import embed_query as get_embedding
+
 CHROMA_PATH = os.path.join(os.path.dirname(__file__), "..", "chroma_db")
-
-
-def get_embedding(text: str) -> list[float]:
-    """Call Google text-embedding-004 to get a vector for the given text."""
-    resp = httpx.post(
-        EMBED_URL,
-        params={"key": GEMINI_API_KEY},
-        json={"model": "models/gemini-embedding-001", "content": {"parts": [{"text": text}]}},
-        timeout=30,
-    )
-    if resp.status_code != 200:
-        raise RuntimeError(f"Embedding error {resp.status_code}: {resp.text}")
-    return resp.json()["embedding"]["values"]
 
 
 def main():
@@ -51,24 +37,49 @@ def main():
         metadata={"hnsw:space": "cosine"},
     )
 
-    print(f"Embedding {len(CHUNKS)} chunks...")
+    print(f"Embedding {len(CHUNKS)} chunks locally (multi-vector)...")
     ids, embeddings, documents, metadatas = [], [], [], []
 
     for i, chunk in enumerate(CHUNKS):
-        queries_block = "\n".join(chunk.get("queries", []))
-        text = f"{chunk['topic']}\n\n{queries_block}\n\n{chunk['content']}"
-        print(f"  [{i+1}/{len(CHUNKS)}] {chunk['id']}")
-        emb = get_embedding(text)
-        ids.append(chunk["id"])
-        embeddings.append(emb)
-        documents.append(chunk["content"])
-        metadatas.append({
+        # Embed the topic and EACH anticipated query phrasing as its OWN
+        # vector — never blended into one string.
+        #
+        # Concatenating them into a single sequence before pooling measurably
+        # hurts retrieval: mean-pooling averages every token in the blob, so
+        # a chunk's own most-relevant phrasing gets diluted by its siblings.
+        # Verified empirically — the bare phrase "what is KST" alone scores
+        # 0.98 cosine similarity against the query "What is KST?"; blended
+        # into the full topic+queries text for that chunk, similarity drops
+        # to ~0.5, well below unrelated chunks. Also excludes `content`
+        # entirely — it runs 400-550 tokens, the embedder truncates at 256,
+        # and long/generic chunks were winning retrieval purely on length.
+        #
+        # Every vector for a chunk shares its chunk_id/doc/metadata so they
+        # can all point at the same document. Retrieval (retriever.py)
+        # over-fetches raw vector matches, then collapses to the single
+        # best-scoring vector per chunk_id before applying top_k.
+        texts = [chunk["topic"]] + chunk.get("queries", [])
+        print(f"  [{i+1}/{len(CHUNKS)}] {chunk['id']} ({len(texts)} vectors)")
+        # Chroma metadata values must be scalars, so lists are flattened
+        meta = {
+            "chunk_id": chunk["id"],
             "topic": chunk["topic"],
             "doc_url": chunk["doc_url"],
-        })
+            "tier": chunk.get("tier", 1),
+            "derived": bool(chunk.get("derived", False)),
+            "platform_tags": ",".join(chunk.get("platform_tags") or []),
+            "source_urls": " ".join(chunk.get("source_urls") or []),
+        }
+        for j, text in enumerate(texts):
+            emb = get_embedding(text)
+            ids.append(f"{chunk['id']}::{j}")
+            embeddings.append(emb)
+            documents.append(chunk["content"])
+            metadatas.append(dict(meta))
 
     collection.add(ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
-    print(f"\nDone! {len(CHUNKS)} chunks stored in ChromaDB at: {CHROMA_PATH}")
+    print(f"\nDone! {len(CHUNKS)} chunks -> {len(ids)} query vectors stored in "
+          f"ChromaDB at: {CHROMA_PATH}")
     print("You can now start the API server with: uvicorn main:app --reload")
 
 

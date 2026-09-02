@@ -30,9 +30,11 @@ if not exist "chroma_db" (
 )
 
 :: Start server
-echo [4/4] Starting KST RAG server on http://localhost:8000
-echo       Open http://localhost:8000 in your browser.
+:: Port 8001: a ghost process holds port 8000 hostage until the next reboot
+:: (known Windows issue on this machine — see CHANGELOG v1.1.0)
+echo [4/4] Starting KST RAG server on http://localhost:8001
+echo       Open http://localhost:8001 in your browser.
 echo       Press Ctrl+C to stop.
 echo.
 cd backend
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn main:app --host 0.0.0.0 --port 8001 --reload
