@@ -60,16 +60,22 @@ def main():
         # best-scoring vector per chunk_id before applying top_k.
         texts = [chunk["topic"]] + chunk.get("queries", [])
         print(f"  [{i+1}/{len(CHUNKS)}] {chunk['id']} ({len(texts)} vectors)")
+        # Chroma metadata values must be scalars, so lists are flattened
+        meta = {
+            "chunk_id": chunk["id"],
+            "topic": chunk["topic"],
+            "doc_url": chunk["doc_url"],
+            "tier": chunk.get("tier", 1),
+            "derived": bool(chunk.get("derived", False)),
+            "platform_tags": ",".join(chunk.get("platform_tags") or []),
+            "source_urls": " ".join(chunk.get("source_urls") or []),
+        }
         for j, text in enumerate(texts):
             emb = get_embedding(text)
             ids.append(f"{chunk['id']}::{j}")
             embeddings.append(emb)
             documents.append(chunk["content"])
-            metadatas.append({
-                "chunk_id": chunk["id"],
-                "topic": chunk["topic"],
-                "doc_url": chunk["doc_url"],
-            })
+            metadatas.append(dict(meta))
 
     collection.add(ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
     print(f"\nDone! {len(CHUNKS)} chunks -> {len(ids)} query vectors stored in "

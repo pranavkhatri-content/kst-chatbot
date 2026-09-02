@@ -255,7 +255,7 @@ def pct(numer: int, denom: int) -> str:
 
 
 def summarise(records: list[dict], provider: str, model: str,
-              runs: int, started: str) -> str:
+              runs: int, started: str, retrieval_only: bool = False) -> str:
     """Build the markdown report."""
     ok = [r for r in records if r["error"] is None]
     failed = [r for r in records if r["error"] is not None]
@@ -267,10 +267,20 @@ def summarise(records: list[dict], provider: str, model: str,
         return vals
 
     lines = []
-    lines.append("# KST Assistant — Capability Report")
-    lines.append("")
-    lines.append(f"- **Provider:** `{provider}`")
-    lines.append(f"- **Model:** `{model}`")
+    if retrieval_only:
+        lines.append("# KST Assistant — Retrieval Report (RAG only, no LLM calls)")
+        lines.append("")
+        lines.append("Generated with `--retrieval-only`: the knowledge base and "
+                     "retriever were exercised, but **no answers were generated** "
+                     "and no LLM server was contacted. Answer-quality metrics "
+                     "(citation, hallucination, adversarial, language) are "
+                     "therefore omitted — only retrieval is measured here.")
+        lines.append("")
+    else:
+        lines.append("# KST Assistant — Capability Report")
+        lines.append("")
+    lines.append(f"- **Provider:** `{provider if not retrieval_only else 'none (retrieval only)'}`")
+    lines.append(f"- **Model:** `{model if not retrieval_only else 'n/a'}`")
     lines.append(f"- **Run started:** {started}")
     lines.append(f"- **Questions:** {len(set(r['id'] for r in records))} "
                  f"x {runs} run(s) = {len(records)} calls")
@@ -341,6 +351,27 @@ def summarise(records: list[dict], provider: str, model: str,
         lines.append(f"| Retrieved at rank 1 | {rank1}/{len(hits)} ({pct(rank1, len(hits))}) |")
         lines.append(f"| Mean rank when found | {statistics.mean(ranks):.2f} |")
     lines.append("")
+
+    if retrieval_only:
+        # Everything below this point describes generated answers, of which
+        # there are none in retrieval-only mode.
+        lines.append("## Per-question retrieval detail")
+        lines.append("")
+        lines.append("| ID | Category | Turns | Retrieved expected? | Rank | Top chunks |")
+        lines.append("|---|---|---|---|---|---|")
+        seen_r = set()
+        for r in records:
+            if r["id"] in seen_r:
+                continue
+            seen_r.add(r["id"])
+            met = r["metrics"]
+            hit = {True: "yes", False: "**NO**", None: "n/a"}[met["retrieval_hit"]]
+            rank = met["retrieval_rank"] or "-"
+            tops = ", ".join(f"`{c['chunk_id']}`" for c in r["retrieved"][:3])
+            lines.append(f"| `{r['id']}` | {r['category']} | {r['n_turns']} | "
+                         f"{hit} | {rank} | {tops} |")
+        lines.append("")
+        return "\n".join(lines)
 
     # ── Grounding / hallucination ──
     lines.append("## 4. Grounding and hallucination")
@@ -516,6 +547,11 @@ def main():
     ap.add_argument("--ids", default=None,
                     help="comma-separated question ids to run (e.g. q09,q23) "
                          "instead of the full set")
+    ap.add_argument("--retrieval-only", action="store_true",
+                    help="score the RAG pipeline without generating anything — "
+                         "makes zero LLM calls. Use this to validate knowledge "
+                         "base changes cheaply; answer-quality metrics are "
+                         "skipped since there is no answer.")
     args = ap.parse_args()
 
     if args.provider == "gemini":
@@ -587,6 +623,23 @@ def main():
                     context = build_context(chunks)
                     system_prompt = build_system_prompt(context)
 
+                    if args.retrieval_only:
+                        # No generation at all — retrieval metrics only.
+                        turn_log.append({
+                            "turn": turn_text,
+                            "retrieved": [
+                                {"topic": c["topic"], "score": c["score"],
+                                 "chunk_id": c["chunk_id"], "doc_url": c["doc_url"]}
+                                for c in chunks
+                            ],
+                            "reply": "",
+                            "finish_reason": None,
+                            "retrieval_seconds": round(retrieval_seconds, 3),
+                            "generation_seconds": 0.0,
+                        })
+                        final = (chunks, context, "", {})
+                        continue
+
                     t1 = time.perf_counter()
                     try:
                         out = call(client, system_prompt, history)
@@ -636,6 +689,16 @@ def main():
                     rec["metrics"] = score_answer(
                         q, reply, chunks, context, " ".join(user_msgs)
                     )
+                    if args.retrieval_only:
+                        met = rec["metrics"]
+                        hit = {True: "hit", False: "**MISS**", None: "n/a"}[
+                            met["retrieval_hit"]]
+                        rank = met["retrieval_rank"] or "-"
+                        topics = ", ".join(c["chunk_id"] or "?"
+                                           for c in rec["retrieved"][:3])
+                        print(f"  {hit:9} rank={rank!s:3} {topics[:60]}")
+                        records.append(rec)
+                        continue
                     flag = ""
                     if rec["metrics"]["hallucinated_urls"]:
                         flag += " [HALLUCINATED URL]"
@@ -665,7 +728,8 @@ def main():
             "records": records,
         }, f, indent=2, ensure_ascii=False)
 
-    report = summarise(records, args.provider, model, args.runs, started)
+    report = summarise(records, args.provider, model, args.runs, started,
+                       retrieval_only=args.retrieval_only)
     with open(os.path.join(outdir, "report.md"), "w", encoding="utf-8") as f:
         f.write(report + "\n")
 

@@ -90,6 +90,8 @@ def retrieve(query: str, top_k: int = 3, max_distance: float = 1.0) -> list[dict
             "chunk_id": meta.get("chunk_id"),
             "topic": meta["topic"],
             "doc_url": meta["doc_url"],
+            "tier": meta.get("tier", 1),
+            "derived": bool(meta.get("derived", False)),
             "score": round(dist, 4),
         })
 
@@ -134,12 +136,27 @@ def retrieve_conversational(latest_query: str, context_query: str,
 
 
 def build_context(chunks: list[dict]) -> str:
-    """Format retrieved chunks into a readable context string for the LLM."""
+    """Format retrieved chunks into a readable context string for the LLM.
+
+    Tier-2 chunks are editorial synthesis across several pages rather than one
+    section of Kelkoo's docs, so they are labelled explicitly — the model must
+    not present them as if quoting the documentation directly.
+    """
     parts = []
     for i, c in enumerate(chunks, 1):
-        parts.append(
-            f"[Source {i}: {c['topic']}]\n"
-            f"Documentation: {c['doc_url']}\n"
-            f"{c['content']}"
-        )
+        if c.get("derived"):
+            header = (
+                f"[Source {i}: {c['topic']} — COMPILED SUMMARY]\n"
+                f"Note: this is an internal summary assembled from several "
+                f"documentation pages, not a direct quote from Kelkoo's docs. "
+                f"Present it as general guidance and point the merchant to the "
+                f"linked page for authoritative detail.\n"
+                f"Documentation: {c['doc_url']}"
+            )
+        else:
+            header = (
+                f"[Source {i}: {c['topic']}]\n"
+                f"Documentation: {c['doc_url']}"
+            )
+        parts.append(f"{header}\n{c['content']}")
     return "\n\n---\n\n".join(parts)
