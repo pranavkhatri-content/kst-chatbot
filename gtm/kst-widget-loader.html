@@ -1,0 +1,23 @@
+<!--
+  KST Chatbot Widget — GTM Custom HTML tag content
+  ==================================================
+  Paste this verbatim into a GTM Custom HTML tag. It loads the widget's JS
+  (which loads its own CSS alongside it — see frontend/kst-chatbot.js init())
+  and points it at a locally-running backend via the data-api attribute.
+
+  This is a LOCAL DEV setup only:
+    - http://localhost:8000 only resolves on the machine actually running
+      `uvicorn main:app` (see backend/README or start.bat).
+    - Works from an HTTPS page (Merchant Centre) because Chrome/Firefox treat
+      localhost as an exception to mixed-content blocking. Verify this holds
+      in whichever browser you test with — don't assume it silently.
+    - CORS is already open (`allow_origins=["*"]` in backend/main.py), so no
+      further config is needed there for this phase.
+
+  Before this goes anywhere near production: replace the localhost URLs below
+  with the real deployed API host, and tighten CORS to that specific origin.
+-->
+<script
+  src="http://localhost:8000/frontend/kst-chatbot.js"
+  data-api="http://localhost:8000/chat">
+</script>
